@@ -13,6 +13,8 @@ namespace PingTestTool
 {
     public partial class GraphWindow : Window
     {
+        #region Приватные поля
+
         private GraphDataManager dataManager;
         private int maxVisiblePoints = 500;
         private bool isSmoothingEnabled = false;
@@ -22,7 +24,16 @@ namespace PingTestTool
         private LinearAxis timeAxis;
         private LineSeries errorSeries;
         private LineSeries normalSeries;
+
+        #endregion
+
+        #region Публичные свойства
+
         public PlotModel PingPlotModel { get; private set; }
+
+        #endregion
+
+        #region Конструктор
 
         public GraphWindow(int pingInterval)
         {
@@ -44,6 +55,10 @@ namespace PingTestTool
             updateTimer.Tick += UpdateGraph;
             updateTimer.Start();
         }
+
+        #endregion
+
+        #region Приватные методы
 
         private void SetupAxes()
         {
@@ -97,12 +112,6 @@ namespace PingTestTool
             errorSeries = new LineSeries { Title = "Error", MarkerType = MarkerType.None, Color = OxyColors.Red };
             PingPlotModel.Series.Add(normalSeries);
             PingPlotModel.Series.Add(errorSeries);
-        }
-
-        public void SetPingData(List<int> pingData)
-        {
-            dataManager.SetPingData(pingData);
-            UpdateGraph(null, null); // Обновление графика
         }
 
         private void UpdateGraph(object sender, EventArgs e)
@@ -180,5 +189,17 @@ namespace PingTestTool
             isSmoothingEnabled = !isSmoothingEnabled; // Переключение состояния
             UpdateGraph(null, null); // Перерисовка графика
         }
+
+        #endregion
+
+        #region Публичные методы
+
+        public void SetPingData(List<int> pingData)
+        {
+            dataManager.SetPingData(pingData);
+            UpdateGraph(null, null); // Обновление графика
+        }
+
+        #endregion
     }
 }

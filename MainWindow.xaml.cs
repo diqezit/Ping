@@ -11,11 +11,17 @@ namespace PingTestTool
 {
     public partial class MainWindow : Window
     {
+        #region Приватные поля
+
         private CancellationTokenSource cancellationTokenSource;
         private GraphWindow graphWindow;
         private IniFileSettings iniSettings;
         private TraceWindow traceWindow;
         private PingService pingService;
+
+        #endregion
+
+        #region Конструктор
 
         public MainWindow()
         {
@@ -40,40 +46,9 @@ namespace PingTestTool
             this.Closed += MainWindow_Closed;
         }
 
-        public class IniFileSettings
-        {
-            private readonly IniFile iniFile;
-            private const string SettingsSection = "PingTestSettings";
+        #endregion
 
-            public IniFileSettings(string filePath)
-            {
-                iniFile = new IniFile(filePath);
-            }
-
-            public void LoadSettings(MainWindow mainWindow)
-            {
-                mainWindow.txtURL.Text = iniFile.Read(SettingsSection, "URL") ?? "google.com";
-                mainWindow.txtPingCount.Text = iniFile.Read(SettingsSection, "PingCount") ?? "10";
-                mainWindow.txtTimeout.Text = iniFile.Read(SettingsSection, "Timeout") ?? "1000";
-                mainWindow.txtLogFile.Text = iniFile.Read(SettingsSection, "LogFile") ?? "C:\\ping_log.txt";
-            }
-
-            public void SaveSettings(MainWindow mainWindow)
-            {
-                iniFile.Write(SettingsSection, "URL", mainWindow.txtURL.Text);
-                iniFile.Write(SettingsSection, "PingCount", mainWindow.txtPingCount.Text);
-                iniFile.Write(SettingsSection, "Timeout", mainWindow.txtTimeout.Text);
-                iniFile.Write(SettingsSection, "LogFile", mainWindow.txtLogFile.Text);
-            }
-
-            public void SetDefaultSettings(MainWindow mainWindow)
-            {
-                mainWindow.txtURL.Text = "google.com";
-                mainWindow.txtPingCount.Text = "10";
-                mainWindow.txtTimeout.Text = "1000";
-                mainWindow.txtLogFile.Text = "C:\\ping_log.txt";
-            }
-        }
+        #region Обработчики событий
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
@@ -106,7 +81,7 @@ namespace PingTestTool
                         txtResults.Clear();
                         pingService.ClearRoundtripTimes();
 
-                        string result = await Task.Run(() => 
+                        string result = await Task.Run(() =>
                         pingService.StartPingTestAsync(url, pingCount, timeout, cancellationTokenSource.Token));
                         await WriteLogFileAsync(logFile, result);
 
@@ -216,7 +191,6 @@ namespace PingTestTool
             MessageBox.Show(message, "Ошибка ввода", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-
         private void UpdateProgressBar(int current, int total)
         {
             Dispatcher.Invoke(() =>
@@ -316,5 +290,46 @@ namespace PingTestTool
                 }
             }
         }
+
+        #endregion
+
+        #region Вложенные классы
+
+        public class IniFileSettings
+        {
+            private readonly IniFile iniFile;
+            private const string SettingsSection = "PingTestSettings";
+
+            public IniFileSettings(string filePath)
+            {
+                iniFile = new IniFile(filePath);
+            }
+
+            public void LoadSettings(MainWindow mainWindow)
+            {
+                mainWindow.txtURL.Text = iniFile.Read(SettingsSection, "URL") ?? "google.com";
+                mainWindow.txtPingCount.Text = iniFile.Read(SettingsSection, "PingCount") ?? "10";
+                mainWindow.txtTimeout.Text = iniFile.Read(SettingsSection, "Timeout") ?? "1000";
+                mainWindow.txtLogFile.Text = iniFile.Read(SettingsSection, "LogFile") ?? "C:\\ping_log.txt";
+            }
+
+            public void SaveSettings(MainWindow mainWindow)
+            {
+                iniFile.Write(SettingsSection, "URL", mainWindow.txtURL.Text);
+                iniFile.Write(SettingsSection, "PingCount", mainWindow.txtPingCount.Text);
+                iniFile.Write(SettingsSection, "Timeout", mainWindow.txtTimeout.Text);
+                iniFile.Write(SettingsSection, "LogFile", mainWindow.txtLogFile.Text);
+            }
+
+            public void SetDefaultSettings(MainWindow mainWindow)
+            {
+                mainWindow.txtURL.Text = "google.com";
+                mainWindow.txtPingCount.Text = "10";
+                mainWindow.txtTimeout.Text = "1000";
+                mainWindow.txtLogFile.Text = "C:\\ping_log.txt";
+            }
+        }
+
+        #endregion
     }
 }

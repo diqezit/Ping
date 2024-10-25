@@ -3,30 +3,6 @@
   "WorkspaceRootPath": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\traceresult.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:traceresult.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\hopdata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:hopdata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\pingmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:pingmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\dnsmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:dnsmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\pingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:pingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|c:\\users\\user\\source\\repos\\\u043F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\logger.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:logger.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\graphdatamanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:graphdatamanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -35,28 +11,52 @@
       "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:graphwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\inifile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:inifile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\tracewindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:tracewindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\inifile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:inifile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\pingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:pingservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\pingmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:pingmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\traceresult.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:traceresult.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\dnsmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:dnsmanager.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\hopdata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:hopdata.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|c:\\users\\user\\source\\repos\\\u043F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\logger.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:logger.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
       "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\graphwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
-      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:graphwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\tracewindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
       "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:tracewindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\graphwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{19E91B1C-5228-4843-823D-E6984BE94277}|\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440.csproj|solutionrelative:graphwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
     }
   ],
   "DocumentGroupContainers": [
@@ -66,7 +66,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 16,
+          "SelectedChildIndex": 9,
           "Children": [
             {
               "$type": "Bookmark",
@@ -90,7 +90,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 12,
+              "DocumentIndex": 13,
               "Title": "GraphWindow.xaml",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\GraphWindow.xaml",
               "RelativeDocumentMoniker": "GraphWindow.xaml",
@@ -102,7 +102,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 13,
+              "DocumentIndex": 12,
               "Title": "TraceWindow.xaml",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\TraceWindow.xaml",
               "RelativeDocumentMoniker": "TraceWindow.xaml",
@@ -126,98 +126,98 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 1,
               "Title": "GraphWindow.xaml.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\GraphWindow.xaml.cs",
               "RelativeDocumentMoniker": "GraphWindow.xaml.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\GraphWindow.xaml.cs",
               "RelativeToolTip": "GraphWindow.xaml.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAATAAAAAAAAAA==",
+              "ViewState": "AgIAAKsAAAAAAAAAAAA5wMwAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-09-23T13:49:53.42Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 0,
               "Title": "GraphDataManager.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\GraphDataManager.cs",
               "RelativeDocumentMoniker": "GraphDataManager.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\GraphDataManager.cs",
               "RelativeToolTip": "GraphDataManager.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAhAAAAAAAAAA==",
+              "ViewState": "AgIAACoAAAAAAAAAAAAswDAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-05T08:54:00.763Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 10,
+              "DocumentIndex": 2,
               "Title": "MainWindow.xaml.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\MainWindow.xaml.cs",
               "RelativeDocumentMoniker": "MainWindow.xaml.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\MainWindow.xaml.cs",
               "RelativeToolTip": "MainWindow.xaml.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAWAAAAAAAAAA==",
+              "ViewState": "AgIAAC4BAAAAAAAAAAAgwDEBAAANAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-09-23T13:49:55.492Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "PingService.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\PingService.cs",
               "RelativeDocumentMoniker": "PingService.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\PingService.cs",
               "RelativeToolTip": "PingService.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAFEAAABLAAAAAAAAAA==",
+              "ViewState": "AgIAABAAAAAAAAAAAAAuwF4AAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-04T16:15:31.685Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 3,
               "Title": "TraceWindow.xaml.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\TraceWindow.xaml.cs",
               "RelativeDocumentMoniker": "TraceWindow.xaml.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\TraceWindow.xaml.cs",
               "RelativeToolTip": "TraceWindow.xaml.cs",
-              "ViewState": "AgIAAAIAAAAAAAAAAAAtwBQAAAAyAAAAAAAAAA==",
+              "ViewState": "AgIAAD8AAAAAAAAAAAAAAPIAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-02T12:42:31.745Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 4,
               "Title": "IniFile.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\IniFile.cs",
               "RelativeDocumentMoniker": "IniFile.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\IniFile.cs",
               "RelativeToolTip": "IniFile.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAYAAAAAAAAAA==",
+              "ViewState": "AgIAABcAAAAAAAAAAAAowEIAAAAxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-04T18:15:51.611Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 6,
               "Title": "PingManager.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\PingManager.cs",
               "RelativeDocumentMoniker": "PingManager.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\PingManager.cs",
               "RelativeToolTip": "PingManager.cs",
-              "ViewState": "AgIAALoAAAAAAAAAAAAwwIAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAABYAAAAAAAAAAAAtwCgAAAAPAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-03T17:49:36.752Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 9,
               "Title": "HopData.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\HopData.cs",
               "RelativeDocumentMoniker": "HopData.cs",
@@ -230,39 +230,39 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 7,
               "Title": "TraceResult.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\TraceResult.cs",
               "RelativeDocumentMoniker": "TraceResult.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\TraceResult.cs",
               "RelativeToolTip": "TraceResult.cs",
-              "ViewState": "AgIAABQAAAAAAAAAAAAgwCYAAABJAAAAAAAAAA==",
+              "ViewState": "AgIAABQAAAAAAAAAAAAgwBgAAAAxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-03T17:42:30.669Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 8,
               "Title": "DnsManager.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\DnsManager.cs",
               "RelativeDocumentMoniker": "DnsManager.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\DnsManager.cs",
               "RelativeToolTip": "DnsManager.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAqAAAAAAAAAA==",
+              "ViewState": "AgIAABEAAAAAAAAAAAAAwBQAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-03T15:31:11.026Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 10,
               "Title": "Logger.cs",
               "DocumentMoniker": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\Logger.cs",
               "RelativeDocumentMoniker": "Logger.cs",
               "ToolTip": "C:\\Users\\user\\source\\repos\\\u041F\u0438\u043D\u0433\u0430\u043B\u044F\u0442\u043E\u0440\\Logger.cs",
               "RelativeToolTip": "Logger.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAARAAAAAAAAAA==",
+              "ViewState": "AgIAAEQAAAAAAAAAAAAQwBEAAAA0AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2024-10-03T15:08:57.254Z",
               "EditorCaption": ""

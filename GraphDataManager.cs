@@ -6,15 +6,25 @@ namespace PingTestTool
 {
     public class GraphDataManager
     {
+        #region Приватные поля
+
         private List<int> pingData;
         private List<double> cachedSmoothedData;
         private bool isDataDirty = true;
         private int smoothingWindowSize = 5;
 
+        #endregion
+
+        #region Конструктор
+
         public GraphDataManager()
         {
             pingData = new List<int>();
         }
+
+        #endregion
+
+        #region Публичные методы
 
         public void SetPingData(List<int> data)
         {
@@ -26,6 +36,20 @@ namespace PingTestTool
         {
             return isSmoothingEnabled ? ApplyMovingAverage(pingData, smoothingWindowSize) : pingData.Select(x => (double)x).ToList();
         }
+
+        public (double Min, double Avg, double Max, double Cur) GetStatistics()
+        {
+            if (pingData.Count == 0)
+            {
+                return (double.NaN, double.NaN, double.NaN, double.NaN);
+            }
+
+            return (pingData.Min(), pingData.Average(), pingData.Max(), pingData.Last());
+        }
+
+        #endregion
+
+        #region Приватные методы
 
         private List<double> ApplyMovingAverage(List<int> data, int windowSize)
         {
@@ -49,14 +73,6 @@ namespace PingTestTool
             return smoothedData;
         }
 
-        public (double Min, double Avg, double Max, double Cur) GetStatistics()
-        {
-            if (pingData.Count == 0)
-            {
-                return (double.NaN, double.NaN, double.NaN, double.NaN);
-            }
-
-            return (pingData.Min(), pingData.Average(), pingData.Max(), pingData.Last());
-        }
+        #endregion
     }
 }
