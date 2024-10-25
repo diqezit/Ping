@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿#nullable enable
+using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Net;
 using System.Net.Sockets;

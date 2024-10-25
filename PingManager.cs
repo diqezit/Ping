@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -158,7 +159,14 @@ namespace PingTestTool
                         await logger.LogAsync(LogLevel.INFO, $"Обработка IPv4 адреса: {ipAddress}");
                 }
 
-                await ProcessTraceLineAsync(ipAddress, ttl, reply, stopwatch.ElapsedMilliseconds, updateUiCallback, token);
+                if (reply != null)
+                {
+                    await ProcessTraceLineAsync(ipAddress, ttl, reply, stopwatch.ElapsedMilliseconds, updateUiCallback, token);
+                }
+                else
+                {
+                    await logger.LogAsync(LogLevel.WARNING, $"Пинг к {host} с TTL {ttl} не удался: ответ равен null");
+                }
             }
             catch (OperationCanceledException)
             {
