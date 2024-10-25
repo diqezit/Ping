@@ -6,97 +6,111 @@ using System.Timers;
 
 namespace PingTestTool
 {
-    public class Logger
+    /// <summary>
+    /// Класс для логирования сообщений в файл.
+    /// </summary>
+    public class Logger : ILogger
     {
-        // Очередь для хранения сообщений лога
+        #region Поля и свойства
+
         private readonly ConcurrentQueue<string> logQueue = new ConcurrentQueue<string>();
-        // Путь к файлу лога
         private readonly string logFilePath;
-        // Путь к комбинированному лог-файлу
         private readonly string combinedLogFilePath;
-        // Таймер для периодической записи логов в файл
         private readonly Timer logFlushTimer;
-        // Интервал для сброса буфера логов в миллисекундах
-        private const int logBufferFlushInterval = 5000;
-        // Размер партии логов, которые будут записаны за раз
-        private const int logBatchSize = 10;
+        private const int LogBufferFlushInterval = 5000;
+        private const int LogBatchSize = 10;
+        private readonly bool combinedLogEnabled;
 
-        private readonly bool combined_log; // Флаг для включения/отключения комбинированного лога
+        #endregion
 
-        // Конструктор для инициализации объекта Logger
+        #region Конструктор
+
+        /// <summary>
+        /// Инициализирует новый экземпляр класса Logger.
+        /// </summary>
+        /// <param name="logFileName">Имя файла для логирования.</param>
+        /// <param name="combinedLogEnabled">Флаг для включения/отключения комбинированного лога.</param>
         public Logger(string logFileName, bool combinedLogEnabled)
         {
-            // Генерируем полный путь к файлу лога
             logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, logFileName);
             combinedLogFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "combined_log.txt");
-            // Инициализируем таймер для сброса логов
-            logFlushTimer = new Timer(logBufferFlushInterval);
-            logFlushTimer.Elapsed += FlushLogs; // Подписываемся на событие таймера
-            logFlushTimer.Start(); // Запускаем таймер
+            logFlushTimer = new Timer(LogBufferFlushInterval);
+            logFlushTimer.Elapsed += FlushLogs;
+            logFlushTimer.Start();
 
-            // Очистка файлов при инициализации
             ClearLogFile(logFilePath);
             ClearLogFile(combinedLogFilePath);
 
-            combined_log = combinedLogEnabled;
+            this.combinedLogEnabled = combinedLogEnabled;
         }
 
-        // Метод для очистки файла лога
+        #endregion
+
+        #region Методы
+
+        /// <summary>
+        /// Очищает файл лога.
+        /// </summary>
+        /// <param name="filePath">Путь к файлу лога.</param>
         private void ClearLogFile(string filePath)
         {
             try
             {
-                File.WriteAllText(filePath, string.Empty); // Очищаем файл лога
+                File.WriteAllText(filePath, string.Empty);
             }
             catch (Exception ex)
             {
-                // Обработка ошибок при очистке файла лога
                 Console.WriteLine($"Ошибка при очистке файла лога: {ex.Message}");
             }
         }
 
-        // Асинхронный метод для записи логов
+        /// <summary>
+        /// Асинхронно записывает сообщение в лог.
+        /// </summary>
+        /// <param name="level">Уровень логирования.</param>
+        /// <param name="message">Сообщение для записи.</param>
+        /// <param name="ex">Исключение (опционально).</param>
         public async Task LogAsync(LogLevel level, string message, Exception ex = null)
         {
-            // Формируем сообщение лога с указанием уровня
             string logMessage = $"[{level}] {message}";
             if (ex != null)
             {
-                logMessage += $" | Exception: {ex.Message}\n{ex.StackTrace}"; // Добавляем информацию об исключении
+                logMessage += $" | Exception: {ex.Message}\n{ex.StackTrace}";
             }
 
-            logQueue.Enqueue(logMessage); // Добавляем сообщение в очередь логов
+            logQueue.Enqueue(logMessage);
 
-            // Если очередь достигла размера партии, записываем логи
-            if (logQueue.Count >= logBatchSize)
+            if (logQueue.Count >= LogBatchSize)
             {
                 await WriteLogsFromQueueAsync().ConfigureAwait(false);
             }
         }
 
-        // Метод для сброса логов по истечении времени таймера
+        /// <summary>
+        /// Обработчик события таймера для сброса логов.
+        /// </summary>
+        /// <param name="sender">Источник события.</param>
+        /// <param name="e">Аргументы события.</param>
         private void FlushLogs(object sender, ElapsedEventArgs e)
         {
-            WriteLogsFromQueueAsync().ConfigureAwait(false); // Запускаем запись логов из очереди
+            WriteLogsFromQueueAsync().ConfigureAwait(false);
         }
 
-        // Асинхронный метод для записи логов из очереди в файл
+        /// <summary>
+        /// Асинхронно записывает логи из очереди в файл.
+        /// </summary>
         private async Task WriteLogsFromQueueAsync()
         {
             try
             {
-                // Открываем файл для дозаписи
                 using (FileStream fs = new FileStream(logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, bufferSize: 4096, useAsync: true))
                 using (StreamWriter writer = new StreamWriter(fs))
                 {
-                    // Пытаемся извлечь и записать все сообщения из очереди
                     while (logQueue.TryDequeue(out string logMessage))
                     {
-                        // Записываем сообщение с меткой времени
                         await writer.WriteLineAsync($"{DateTime.Now}: {logMessage}").ConfigureAwait(false);
 
-                        // Если комбинированный лог включен, записываем в combined_log.txt
-                        if (combined_log)
+                        if (combinedLogEnabled)
                         {
                             using (FileStream combinedFs = new FileStream(combinedLogFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, bufferSize: 4096, useAsync: true))
                             using (StreamWriter combinedWriter = new StreamWriter(combinedFs))
@@ -109,21 +123,39 @@ namespace PingTestTool
             }
             catch (IOException ioEx)
             {
-                Console.WriteLine($"Ошибка записи в лог: {ioEx.Message}"); // Обработка ошибок ввода-вывода
+                Console.WriteLine($"Ошибка записи в лог: {ioEx.Message}");
             }
             catch (Exception logEx)
             {
-                await LogAsync(LogLevel.ERROR, $"Неизвестная ошибка при записи в лог: {logEx.Message}", logEx).ConfigureAwait(false); // Логируем ошибку
+                await LogAsync(LogLevel.ERROR, $"Неизвестная ошибка при записи в лог: {logEx.Message}", logEx).ConfigureAwait(false);
             }
         }
+
+        #endregion
     }
 
-    // Перечисление для уровней логирования
+    /// <summary>
+    /// Интерфейс для логирования сообщений.
+    /// </summary>
+    public interface ILogger
+    {
+        /// <summary>
+        /// Асинхронно записывает сообщение в лог.
+        /// </summary>
+        /// <param name="level">Уровень логирования.</param>
+        /// <param name="message">Сообщение для записи.</param>
+        /// <param name="ex">Исключение (опционально).</param>
+        Task LogAsync(LogLevel level, string message, Exception ex = null);
+    }
+
+    /// <summary>
+    /// Перечисление для уровней логирования.
+    /// </summary>
     public enum LogLevel
     {
-        INFO,          // Уровень информации
-        WARNING,       // Уровень предупреждений
-        ERROR,          // Уровень ошибок
-        DEBUG           // Уровень отладки
+        INFO,
+        WARNING,
+        ERROR,
+        DEBUG
     }
 }
