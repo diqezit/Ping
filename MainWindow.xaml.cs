@@ -18,6 +18,7 @@ namespace PingTestTool
         private IniFileSettings iniSettings;
         private TraceWindow traceWindow;
         private PingService pingService;
+        private ILogger _logger;
 
         #endregion
 
@@ -44,6 +45,9 @@ namespace PingTestTool
             pingService.OnRoundtripTimeAdded += UpdateGraph;
 
             this.Closed += MainWindow_Closed;
+
+            // Инициализируем Logger
+            _logger = new Logger("main_window_log.txt", true);
         }
 
         #endregion
@@ -94,15 +98,24 @@ namespace PingTestTool
             }
             catch (Exception ex)
             {
+                await _logger.LogAsync(LogLevel.ERROR, $"Произошла ошибка: {ex.Message}", ex).ConfigureAwait(false);
                 MessageBox.Show($"Произошла ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private async Task WriteLogFileAsync(string iniFilePath, string content)
         {
-            using (var writer = new StreamWriter(iniFilePath))
+            try
             {
-                await writer.WriteAsync(content);
+                using (var writer = new StreamWriter(iniFilePath))
+                {
+                    await writer.WriteAsync(content);
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logger.LogAsync(LogLevel.ERROR, $"Ошибка записи в лог-файл: {ex.Message}", ex).ConfigureAwait(false);
+                MessageBox.Show($"Ошибка записи в лог-файл: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

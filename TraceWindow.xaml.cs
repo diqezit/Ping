@@ -19,7 +19,7 @@ namespace PingTestTool
     {
         #region Поля
 
-        private readonly Logger logger;
+        private ILogger logger;
         private CancellationTokenSource _cts;
         private bool isTracing;
         private readonly string traceUrl;
@@ -47,7 +47,7 @@ namespace PingTestTool
         {
             InitializeComponent();
             CombinedLogEnabled = chkCombinedLog.IsChecked ?? false;
-            logger = new Logger("combined_log.txt", CombinedLogEnabled);
+            logger = new Logger("trace_window_log.txt", CombinedLogEnabled);
             memoryCache = new MemoryCache(new MemoryCacheOptions());
 
             TraceResults = CollectionViewSource.GetDefaultView(traceResultsInternal);
@@ -163,7 +163,7 @@ namespace PingTestTool
                 }
                 catch (Exception ex)
                 {
-                    await logger.LogAsync(LogLevel.WARNING, $"Ошибка: {ex.Message}\n{ex.StackTrace}");
+                    await logger.LogAsync(LogLevel.ERROR, $"Ошибка: {ex.Message}\n{ex.StackTrace}", ex);
                     ShowMessage($"Ошибка: {ex.Message}\n{ex.StackTrace}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 finally

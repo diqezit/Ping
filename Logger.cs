@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Timers;
@@ -56,7 +57,10 @@ namespace PingTestTool
         {
             try
             {
-                File.WriteAllText(filePath, string.Empty);
+                if (File.Exists(filePath))
+                {
+                    File.WriteAllText(filePath, string.Empty);
+                }
             }
             catch (Exception ex)
             {
@@ -93,7 +97,14 @@ namespace PingTestTool
         /// <param name="e">Аргументы события.</param>
         private void FlushLogs(object sender, ElapsedEventArgs e)
         {
-            WriteLogsFromQueueAsync().ConfigureAwait(false);
+            try
+            {
+                WriteLogsFromQueueAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при сбросе логов: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -103,31 +114,46 @@ namespace PingTestTool
         {
             try
             {
-                using (FileStream fs = new FileStream(logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, bufferSize: 4096, useAsync: true))
-                using (StreamWriter writer = new StreamWriter(fs))
+                var logMessages = new List<string>();
+                while (logQueue.TryDequeue(out string logMessage))
                 {
-                    while (logQueue.TryDequeue(out string logMessage))
-                    {
-                        await writer.WriteLineAsync($"{DateTime.Now}: {logMessage}").ConfigureAwait(false);
+                    logMessages.Add($"{DateTime.Now}: {logMessage}");
+                }
 
-                        if (combinedLogEnabled)
-                        {
-                            using (FileStream combinedFs = new FileStream(combinedLogFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, bufferSize: 4096, useAsync: true))
-                            using (StreamWriter combinedWriter = new StreamWriter(combinedFs))
-                            {
-                                await combinedWriter.WriteLineAsync($"{DateTime.Now}: {logMessage}").ConfigureAwait(false);
-                            }
-                        }
+                if (logMessages.Count > 0)
+                {
+                    await WriteLogBatchAsync(logFilePath, logMessages).ConfigureAwait(false);
+
+                    if (combinedLogEnabled)
+                    {
+                        await WriteLogBatchAsync(combinedLogFilePath, logMessages).ConfigureAwait(false);
                     }
                 }
             }
             catch (IOException ioEx)
             {
-                Console.WriteLine($"Ошибка записи в лог: {ioEx.Message}");
+                await LogAsync(LogLevel.ERROR, $"Ошибка записи в лог: {ioEx.Message}", ioEx).ConfigureAwait(false);
             }
             catch (Exception logEx)
             {
                 await LogAsync(LogLevel.ERROR, $"Неизвестная ошибка при записи в лог: {logEx.Message}", logEx).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Асинхронно записывает пакет логов в файл.
+        /// </summary>
+        /// <param name="filePath">Путь к файлу лога.</param>
+        /// <param name="logMessages">Список сообщений для записи.</param>
+        private async Task WriteLogBatchAsync(string filePath, List<string> logMessages)
+        {
+            using (FileStream fs = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, bufferSize: 4096, useAsync: true))
+            using (StreamWriter writer = new StreamWriter(fs))
+            {
+                foreach (var logMessage in logMessages)
+                {
+                    await writer.WriteLineAsync(logMessage).ConfigureAwait(false);
+                }
             }
         }
 

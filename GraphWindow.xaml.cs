@@ -5,6 +5,7 @@ using OxyPlot.Series;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -29,11 +30,12 @@ namespace PingTestTool
         private readonly int _maxVisiblePoints;
         private bool _isSmoothingEnabled;
 
-        private readonly DispatcherTimer _updateTimer;
+        private DispatcherTimer _updateTimer;
         private readonly LinearAxis _pingAxis;
         private readonly LinearAxis _timeAxis;
         private readonly LineSeries _errorSeries;
         private readonly LineSeries _normalSeries;
+        private ILogger _logger;
 
         #endregion
 
@@ -66,10 +68,13 @@ namespace PingTestTool
                 _updateTimer = InitializeTimer(pingInterval);
 
                 ConfigurePlotModel();
+
+                // Инициализируем Logger
+                _logger = new Logger("graph_window_log.txt", true);
             }
             catch (Exception ex)
             {
-                HandleInitializationError(ex);
+                HandleInitializationErrorAsync(ex).GetAwaiter().GetResult();
                 throw;
             }
         }
@@ -148,7 +153,6 @@ namespace PingTestTool
                 Interval = TimeSpan.FromMilliseconds(pingInterval)
             };
             timer.Tick += UpdateGraph;
-            timer.Start();
             return timer;
         }
 
@@ -172,7 +176,7 @@ namespace PingTestTool
         /// </summary>
         /// <param name="sender">Источник события.</param>
         /// <param name="e">Аргументы события.</param>
-        private void UpdateGraph(object? sender, EventArgs e)
+        private async void UpdateGraph(object? sender, EventArgs e)
         {
             try
             {
@@ -184,7 +188,7 @@ namespace PingTestTool
             }
             catch (Exception ex)
             {
-                HandleGraphUpdateError(ex);
+                await HandleGraphUpdateErrorAsync(ex).ConfigureAwait(false);
             }
         }
 
@@ -243,7 +247,7 @@ namespace PingTestTool
             }
 
             var startIndex = Math.Max(0, data.Count - _maxVisiblePoints);
-            var visibleData = data.Skip(startIndex);
+            var visibleData = data.Skip(startIndex).ToList();
 
             _timeAxis.Minimum = startIndex;
             _timeAxis.Maximum = data.Count - 1;
@@ -295,8 +299,9 @@ namespace PingTestTool
         /// Обрабатывает ошибки инициализации.
         /// </summary>
         /// <param name="ex">Исключение, возникшее при инициализации.</param>
-        private void HandleInitializationError(Exception ex)
+        private async Task HandleInitializationErrorAsync(Exception ex)
         {
+            await _logger.LogAsync(LogLevel.ERROR, $"Ошибка инициализации графика: {ex.Message}").ConfigureAwait(false);
             MessageBox.Show(
                 $"Ошибка инициализации графика: {ex.Message}",
                 "Ошибка",
@@ -308,8 +313,9 @@ namespace PingTestTool
         /// Обрабатывает ошибки обновления графика.
         /// </summary>
         /// <param name="ex">Исключение, возникшее при обновлении.</param>
-        private void HandleGraphUpdateError(Exception ex)
+        private async Task HandleGraphUpdateErrorAsync(Exception ex)
         {
+            await _logger.LogAsync(LogLevel.ERROR, $"Произошла ошибка при обновлении графика. Проверьте данные и повторите попытку. {ex.Message}").ConfigureAwait(false);
             MessageBox.Show(
                 "Произошла ошибка при обновлении графика. Проверьте данные и повторите попытку.",
                 "Ошибка обновления",
@@ -349,7 +355,7 @@ namespace PingTestTool
             }
             catch (Exception ex)
             {
-                HandleGraphUpdateError(ex);
+                HandleGraphUpdateErrorAsync(ex).GetAwaiter().GetResult();
             }
         }
 
