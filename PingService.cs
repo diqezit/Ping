@@ -20,7 +20,7 @@ namespace PingTestTool
 
         #region Приватные поля
 
-        public List<int> roundtripTimes = new();
+        public List<int> roundtripTimes = new List<int>();
 
         #endregion
 

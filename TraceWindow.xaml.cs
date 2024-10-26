@@ -23,7 +23,7 @@ namespace PingTestTool
         private CancellationTokenSource _cts;
         private bool isTracing;
         private readonly string traceUrl;
-        private ObservableCollection<TraceResult> traceResultsInternal = new ObservableCollection<TraceResult>();
+        private readonly ObservableCollection<TraceResult> traceResultsInternal = new();
         private readonly IMemoryCache memoryCache;
         private readonly DnsManager dnsManager;
         private readonly PingManager pingManager;

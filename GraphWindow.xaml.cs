@@ -11,193 +11,346 @@ using System.Windows.Threading;
 
 namespace PingTestTool
 {
+    /// <summary>
+    /// Окно для отображения графика времени отклика для Ping.
+    /// </summary>
     public partial class GraphWindow : Window
     {
+        #region Константы
+
+        private const int DEFAULT_MAX_VISIBLE_POINTS = 500;
+        private const string GRAPH_TITLE = "График по времени отклика для Ping";
+
+        #endregion
+
         #region Приватные поля
 
-        private GraphDataManager dataManager;
-        private int maxVisiblePoints = 500;
-        private bool isSmoothingEnabled = false;
+        private readonly GraphDataManager _dataManager;
+        private readonly int _maxVisiblePoints;
+        private bool _isSmoothingEnabled;
 
-        private DispatcherTimer updateTimer;
-        private LinearAxis pingAxis;
-        private LinearAxis timeAxis;
-        private LineSeries errorSeries;
-        private LineSeries normalSeries;
+        private readonly DispatcherTimer _updateTimer;
+        private readonly LinearAxis _pingAxis;
+        private readonly LinearAxis _timeAxis;
+        private readonly LineSeries _errorSeries;
+        private readonly LineSeries _normalSeries;
 
         #endregion
 
         #region Публичные свойства
 
-        public PlotModel PingPlotModel { get; private set; }
+        public PlotModel PingPlotModel { get; }
 
         #endregion
 
         #region Конструктор
 
+        /// <summary>
+        /// Инициализирует новый экземпляр класса <see cref="GraphWindow"/>.
+        /// </summary>
+        /// <param name="pingInterval">Интервал пинга в миллисекундах.</param>
         public GraphWindow(int pingInterval)
         {
-            InitializeComponent();
-
-            PingPlotModel = new PlotModel { Title = "График по времени отклика для Ping" };
-            DataContext = this;
-
-            dataManager = new GraphDataManager();
-
-            SetupAxes(); // Настройка осей
-            SetupSeries();
-
-            // Настройка таймера
-            updateTimer = new DispatcherTimer
+            try
             {
-                Interval = TimeSpan.FromMilliseconds(pingInterval)
-            };
-            updateTimer.Tick += UpdateGraph;
-            updateTimer.Start();
+                InitializeComponent();
+
+                _maxVisiblePoints = DEFAULT_MAX_VISIBLE_POINTS;
+                _dataManager = new GraphDataManager();
+
+                PingPlotModel = new PlotModel { Title = GRAPH_TITLE };
+                DataContext = this;
+
+                (_timeAxis, _pingAxis) = InitializeAxes();
+                (_normalSeries, _errorSeries) = InitializeSeries();
+                _updateTimer = InitializeTimer(pingInterval);
+
+                ConfigurePlotModel();
+            }
+            catch (Exception ex)
+            {
+                HandleInitializationError(ex);
+                throw;
+            }
         }
 
         #endregion
 
-        #region Приватные методы
+        #region Инициализация компонентов
 
-        private void SetupAxes()
+        /// <summary>
+        /// Инициализирует оси графика.
+        /// </summary>
+        /// <returns>Кортеж с осями времени и пинга.</returns>
+        private (LinearAxis TimeAxis, LinearAxis PingAxis) InitializeAxes()
         {
-            timeAxis = new LinearAxis // Настройка оси времени
+            var timeAxis = new LinearAxis
             {
-                FontSize = 12,
-                Font = "Segoe UI",
                 Position = AxisPosition.Bottom,
                 Title = "Пакет",
-                Minimum = 0,
-                MaximumPadding = 0,  // Отключаем отступы
-                MinimumPadding = 0,
-                MajorGridlineStyle = LineStyle.Solid,
-                MinorGridlineStyle = LineStyle.Dot,
-                IsPanEnabled = true,
-                IsZoomEnabled = true,  // Включаем масштабирование
-                MinimumRange = 1,       // Ограничение zoom out — минимум 1 единица по времени
-                TextColor = OxyColors.Black,  // Цвет текста оси
-                AxislineColor = OxyColors.LightGray,  // Светло-серый цвет линии оси
-                MajorGridlineColor = OxyColors.Gray,  // Серый цвет основной сетки
-                MinorGridlineColor = OxyColors.DarkSlateGray  // Темно-серый цвет дополнительной сетки
-            };
-
-            PingPlotModel.Axes.Add(timeAxis);
-
-            pingAxis = new LinearAxis
-            {
                 FontSize = 12,
                 Font = "Segoe UI",
-                Position = AxisPosition.Left,
-                Title = "Время отклика (мс)",
+                Minimum = 0,
+                MaximumPadding = 0,
+                MinimumPadding = 0,
                 MajorGridlineStyle = LineStyle.Solid,
                 MinorGridlineStyle = LineStyle.Dot,
                 IsPanEnabled = true,
-                IsZoomEnabled = true,  // Включаем масштабирование
-                MinimumRange = 10,     // Ограничение zoom out — минимум 10 мс
-                MaximumPadding = 0,    // Отключаем отступы
-                MinimumPadding = 0,
-                TextColor = OxyColors.Black,  // Цвет текста оси
-                AxislineColor = OxyColors.LightGray,  // Светло-серый цвет линии оси
-                MajorGridlineColor = OxyColors.Gray,  // Серый цвет основной сетки
-                MinorGridlineColor = OxyColors.DarkSlateGray  // Темно-серый цвет дополнительной сетки
+                IsZoomEnabled = true,
+                MinimumRange = 1,
+                TextColor = OxyColors.Black,
+                AxislineColor = OxyColors.LightGray,
+                MajorGridlineColor = OxyColors.Gray,
+                MinorGridlineColor = OxyColors.DarkSlateGray
             };
 
-            PingPlotModel.Axes.Add(pingAxis);
+            var pingAxis = new LinearAxis
+            {
+                Position = AxisPosition.Left,
+                Title = "Время отклика (мс)",
+                FontSize = 12,
+                Font = "Segoe UI",
+                MinimumRange = 10,
+                MaximumPadding = 0,
+                MinimumPadding = 0,
+                MajorGridlineStyle = LineStyle.Solid,
+                MinorGridlineStyle = LineStyle.Dot,
+                IsPanEnabled = true,
+                IsZoomEnabled = true,
+                TextColor = OxyColors.Black,
+                AxislineColor = OxyColors.LightGray,
+                MajorGridlineColor = OxyColors.Gray,
+                MinorGridlineColor = OxyColors.DarkSlateGray
+            };
+
+            return (timeAxis, pingAxis);
         }
 
-        private void SetupSeries()
+        /// <summary>
+        /// Инициализирует серии данных для графика.
+        /// </summary>
+        /// <returns>Кортеж с сериями нормальных и ошибочных данных.</returns>
+        private (LineSeries NormalSeries, LineSeries ErrorSeries) InitializeSeries() =>
+            (
+                new LineSeries { Title = "Ping", MarkerType = MarkerType.None, Color = OxyColors.Blue },
+                new LineSeries { Title = "Error", MarkerType = MarkerType.None, Color = OxyColors.Red }
+            );
+
+        /// <summary>
+        /// Инициализирует таймер обновления графика.
+        /// </summary>
+        /// <param name="pingInterval">Интервал пинга в миллисекундах.</param>
+        /// <returns>Инициализированный таймер.</returns>
+        private DispatcherTimer InitializeTimer(int pingInterval)
         {
-            normalSeries = new LineSeries { Title = "Ping", MarkerType = MarkerType.None, Color = OxyColors.Blue };
-            errorSeries = new LineSeries { Title = "Error", MarkerType = MarkerType.None, Color = OxyColors.Red };
-            PingPlotModel.Series.Add(normalSeries);
-            PingPlotModel.Series.Add(errorSeries);
+            var timer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(pingInterval)
+            };
+            timer.Tick += UpdateGraph;
+            timer.Start();
+            return timer;
         }
 
-        private void UpdateGraph(object sender, EventArgs e)
+        /// <summary>
+        /// Настраивает модель графика.
+        /// </summary>
+        private void ConfigurePlotModel()
         {
-            var dataToPlot = dataManager.GetDataToPlot(isSmoothingEnabled);
+            PingPlotModel.Axes.Add(_timeAxis);
+            PingPlotModel.Axes.Add(_pingAxis);
+            PingPlotModel.Series.Add(_normalSeries);
+            PingPlotModel.Series.Add(_errorSeries);
+        }
 
-            normalSeries.Points.Clear();
-            errorSeries.Points.Clear();
+        #endregion
+
+        #region Обновление графика
+
+        /// <summary>
+        /// Обновляет график на основе новых данных.
+        /// </summary>
+        /// <param name="sender">Источник события.</param>
+        /// <param name="e">Аргументы события.</param>
+        private void UpdateGraph(object? sender, EventArgs e)
+        {
+            try
+            {
+                var dataToPlot = _dataManager.GetDataToPlot(_isSmoothingEnabled);
+                UpdateSeriesData(dataToPlot);
+                UpdateAxesRanges(dataToPlot);
+                UpdateStatistics();
+                PingPlotModel.InvalidatePlot(true);
+            }
+            catch (Exception ex)
+            {
+                HandleGraphUpdateError(ex);
+            }
+        }
+
+        /// <summary>
+        /// Обновляет данные серий на графике.
+        /// </summary>
+        /// <param name="data">Данные для обновления.</param>
+        private void UpdateSeriesData(IReadOnlyList<double> data)
+        {
+            _normalSeries.Points.Clear();
+            _errorSeries.Points.Clear();
             PingPlotModel.Annotations.Clear();
 
-            for (int i = Math.Max(0, dataToPlot.Count - maxVisiblePoints); i < dataToPlot.Count; i++)
+            var startIndex = Math.Max(0, data.Count - _maxVisiblePoints);
+            for (var i = startIndex; i < data.Count; i++)
             {
-                if (dataToPlot[i] <= 0)
+                var point = new DataPoint(i, data[i]);
+                if (data[i] <= 0)
                 {
-                    errorSeries.Points.Add(new DataPoint(i, dataToPlot[i]));
-                    PingPlotModel.Annotations.Add(new TextAnnotation
-                    {
-                        Text = "Error",
-                        TextPosition = new DataPoint(i, dataToPlot[i]),
-                        TextColor = OxyColors.Red,
-                        FontSize = 10,
-                        FontWeight = OxyPlot.FontWeights.Bold
-                    });
+                    AddErrorPoint(point);
                 }
                 else
                 {
-                    normalSeries.Points.Add(new DataPoint(i, dataToPlot[i]));
+                    _normalSeries.Points.Add(point);
                 }
             }
-
-            UpdateAxes();
-            PingPlotModel.InvalidatePlot(true);
-            UpdateStatistics();
         }
 
-        private void UpdateAxes()
+        /// <summary>
+        /// Добавляет точку ошибки на график.
+        /// </summary>
+        /// <param name="point">Точка данных.</param>
+        private void AddErrorPoint(DataPoint point)
         {
-            var pingData = dataManager.GetDataToPlot(isSmoothingEnabled);
-
-            if (pingData.Count == 0)
+            _errorSeries.Points.Add(point);
+            PingPlotModel.Annotations.Add(new TextAnnotation
             {
-                timeAxis.Minimum = 0;
-                timeAxis.Maximum = 100;
-                pingAxis.Minimum = 0;
-                pingAxis.Maximum = 100;
+                Text = "Error",
+                TextPosition = point,
+                TextColor = OxyColors.Red,
+                FontSize = 10,
+                FontWeight = OxyPlot.FontWeights.Bold
+            });
+        }
+
+        /// <summary>
+        /// Обновляет диапазоны осей на графике.
+        /// </summary>
+        /// <param name="data">Данные для обновления.</param>
+        private void UpdateAxesRanges(IReadOnlyList<double> data)
+        {
+            if (data.Count == 0)
+            {
+                SetDefaultAxesRanges();
                 return;
             }
 
-            int startIndex = Math.Max(0, pingData.Count - maxVisiblePoints);
-            timeAxis.Minimum = startIndex;
-            timeAxis.Maximum = pingData.Count - 1;
+            var startIndex = Math.Max(0, data.Count - _maxVisiblePoints);
+            var visibleData = data.Skip(startIndex);
 
-            var visibleData = pingData.Skip(startIndex);
-            pingAxis.Minimum = visibleData.Min();
-            pingAxis.Maximum = visibleData.Max() + 10;
+            _timeAxis.Minimum = startIndex;
+            _timeAxis.Maximum = data.Count - 1;
+            _pingAxis.Minimum = visibleData.Min();
+            _pingAxis.Maximum = visibleData.Max() + 10;
         }
 
+        /// <summary>
+        /// Устанавливает диапазоны осей по умолчанию.
+        /// </summary>
+        private void SetDefaultAxesRanges()
+        {
+            _timeAxis.Minimum = 0;
+            _timeAxis.Maximum = 100;
+            _pingAxis.Minimum = 0;
+            _pingAxis.Maximum = 100;
+        }
+
+        #endregion
+
+        #region Обработка статистики
+
+        /// <summary>
+        /// Обновляет статистику на графике.
+        /// </summary>
         private void UpdateStatistics()
         {
-            var stats = dataManager.GetStatistics();
+            var stats = _dataManager.GetStatistics();
 
-            SetText(txtMin, stats.Min.ToString());
-            SetText(txtAvg, stats.Avg.ToString("F2"));
-            SetText(txtMax, stats.Max.ToString());
-            SetText(txtCur, stats.Cur.ToString());
+            SetStatisticsText(txtMin, stats.Min);
+            SetStatisticsText(txtAvg, stats.Avg);
+            SetStatisticsText(txtMax, stats.Max);
+            SetStatisticsText(txtCur, stats.Cur);
         }
 
-        private void SetText(TextBlock textBlock, string value)
+        /// <summary>
+        /// Устанавливает текст статистики в указанный TextBlock.
+        /// </summary>
+        /// <param name="textBlock">TextBlock для отображения статистики.</param>
+        /// <param name="value">Значение статистики.</param>
+        private static void SetStatisticsText(TextBlock textBlock, double value) =>
+            textBlock.Text = double.IsNaN(value) ? "-" : value.ToString();
+
+        #endregion
+
+        #region Обработка ошибок
+
+        /// <summary>
+        /// Обрабатывает ошибки инициализации.
+        /// </summary>
+        /// <param name="ex">Исключение, возникшее при инициализации.</param>
+        private void HandleInitializationError(Exception ex)
         {
-            textBlock.Text = value;
+            MessageBox.Show(
+                $"Ошибка инициализации графика: {ex.Message}",
+                "Ошибка",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
 
-        private void ToggleSmoothing(object sender, RoutedEventArgs e) // Сглаживание
+        /// <summary>
+        /// Обрабатывает ошибки обновления графика.
+        /// </summary>
+        /// <param name="ex">Исключение, возникшее при обновлении.</param>
+        private void HandleGraphUpdateError(Exception ex)
         {
-            isSmoothingEnabled = !isSmoothingEnabled; // Переключение состояния
-            UpdateGraph(null, null); // Перерисовка графика
+            MessageBox.Show(
+                "Произошла ошибка при обновлении графика. Проверьте данные и повторите попытку.",
+                "Ошибка обновления",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        #endregion
+
+        #region Обработчики событий
+
+        /// <summary>
+        /// Переключает режим сглаживания данных на графике.
+        /// </summary>
+        /// <param name="sender">Источник события.</param>
+        /// <param name="e">Аргументы события.</param>
+        private void ToggleSmoothing(object sender, RoutedEventArgs e)
+        {
+            _isSmoothingEnabled = !_isSmoothingEnabled;
+            UpdateGraph(null, EventArgs.Empty);
         }
 
         #endregion
 
         #region Публичные методы
 
+        /// <summary>
+        /// Устанавливает данные пинга для отображения на графике.
+        /// </summary>
+        /// <param name="pingData">Список данных пинга.</param>
         public void SetPingData(List<int> pingData)
         {
-            dataManager.SetPingData(pingData);
-            UpdateGraph(null, null); // Обновление графика
+            try
+            {
+                _dataManager.SetPingData(pingData);
+                UpdateGraph(null, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                HandleGraphUpdateError(ex);
+            }
         }
 
         #endregion
