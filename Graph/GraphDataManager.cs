@@ -8,8 +8,11 @@ using OxyPlot.Series;
 using Serilog;
 using static PingTestTool.GraphTools;
 
+#nullable enable
+
 namespace PingTestTool
 {
+    #region GraphTools
     public static class GraphTools
     {
         public static class Defaults
@@ -95,7 +98,9 @@ namespace PingTestTool
             if (smoothingWindow < 2) throw new ArgumentException("Сглаживающее окно должно быть не менее 2");
         }
     }
+    #endregion
 
+    #region Interfaces and Records
     public interface ITimestampedData
     {
         DateTime Timestamp { get; }
@@ -108,7 +113,9 @@ namespace PingTestTool
     }
 
     public readonly record struct TimestampedData(DateTime Timestamp, int Value) : ITimestampedData;
+    #endregion
 
+    #region GraphSettings
     public static class GraphSettings
     {
         private static readonly OxyColor WarningZoneColor = OxyColor.FromAColor(80, OxyColors.Orange);
@@ -211,7 +218,9 @@ namespace PingTestTool
             catch (Exception ex) { Log.Error($"Ошибка тика таймера: {ex.Message}"); }
         }
     }
+    #endregion
 
+    #region GraphDataManager
     public class GraphDataManager : IDisposable
     {
         private readonly List<int> _pingData = new();
@@ -308,4 +317,5 @@ namespace PingTestTool
             public DateTime Timestamp { get; } = DateTime.Now;
         }
     }
+    #endregion
 }

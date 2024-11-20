@@ -12,10 +12,13 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 
+#nullable enable
+
 namespace PingTestTool
 {
     public partial class GraphWindow : Window, IDisposable, INotifyPropertyChanged
     {
+        #region Fields
         private readonly GraphDataManager _dataManager = new();
         private readonly DispatcherTimer _updateTimer;
         private readonly LinearAxis _pingAxis;
@@ -33,7 +36,9 @@ namespace PingTestTool
         private double _zoomLevel = 1.0;
         private double _warningThreshold = 100;
         private double _criticalThreshold = 200;
+        #endregion
 
+        #region Properties
         public PlotModel PingPlotModel { get; } = new()
         {
             Title = GraphTools.Defaults.GRAPH_TITLE,
@@ -79,7 +84,9 @@ namespace PingTestTool
             get => _maxVisiblePoints;
             set => SetProperty(ref _maxVisiblePoints, value, () => UpdateGraph(null, EventArgs.Empty));
         }
+        #endregion
 
+        #region Constructor
         public GraphWindow(int pingInterval)
         {
             InitializeComponent();
@@ -90,7 +97,9 @@ namespace PingTestTool
             _updateTimer = GraphSettings.InitializeTimer(pingInterval, UpdateGraph);
             InitializePlotModel();
         }
+        #endregion
 
+        #region Initialization
         private void InitializePlotModel()
         {
             PingPlotModel.Axes.Add(_timeAxis);
@@ -122,7 +131,9 @@ namespace PingTestTool
             }));
             plotView.Controller = controller;
         }
+        #endregion
 
+        #region Update Methods
         private async void UpdateGraph(object? sender, EventArgs e)
         {
             if (_isPaused) return;
@@ -206,7 +217,9 @@ namespace PingTestTool
                 _timeAxis.Maximum = DateTimeAxis.ToDouble(latest.AddSeconds(1));
             }
         }
+        #endregion
 
+        #region Public Methods
         public void SetPingData(List<int> pingData)
         {
             try
@@ -241,7 +254,9 @@ namespace PingTestTool
             _updateTimer.Interval = TimeSpan.FromMilliseconds(milliseconds);
             Log.Information("Refresh rate set to {Milliseconds} ms", milliseconds);
         }
+        #endregion
 
+        #region Context Menu
         private void ShowContextMenu(OxyMouseDownEventArgs e)
         {
             if (e == null)
@@ -269,7 +284,9 @@ namespace PingTestTool
             menu.Items.Add(logScaleItem);
             menu.IsOpen = true;
         }
+        #endregion
 
+        #region UI Interaction
         public string PauseButtonContent => _isPaused ? "Продолжить" : "Пауза";
 
         private void OnTogglePauseClick(object sender, RoutedEventArgs e)
@@ -278,7 +295,9 @@ namespace PingTestTool
             OnPropertyChanged(nameof(PauseButtonContent));
             Log.Information("Pause button clicked. New state: {PauseButtonContent}", PauseButtonContent);
         }
+        #endregion
 
+        #region IDisposable Implementation
         public void Dispose()
         {
             try
@@ -289,7 +308,9 @@ namespace PingTestTool
             }
             catch (Exception ex) { Log.Error(ex, "Error during disposing of GraphWindow resources."); }
         }
+        #endregion
 
+        #region INotifyPropertyChanged Implementation
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged(string propertyName)
@@ -307,5 +328,6 @@ namespace PingTestTool
                 OnPropertyChanged(nameof(field));
             }
         }
+        #endregion
     }
 }
