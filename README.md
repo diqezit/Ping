@@ -60,3 +60,12 @@ ToggleSmoothing: Toggle the data smoothing mode on the graph.
 Additional functions
 Scaling and panning the graph.
 Update timer to display real-time data.
+
+
+![image](https://github.com/user-attachments/assets/12c6594b-06b5-44a4-a11d-63bcdf494847)
+![image](https://github.com/user-attachments/assets/24459dd6-7aa6-404d-811d-717d071c2910)
+![image](https://github.com/user-attachments/assets/f0149f8c-84ae-4667-a6b4-1896e207eda4)
+![image](https://github.com/user-attachments/assets/82bfd07c-e20e-486d-ad30-04df1bb3637d)
+
+
+
