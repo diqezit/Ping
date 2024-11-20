@@ -1,15 +1,4 @@
-﻿using Microsoft.Win32;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-
-#nullable enable
+﻿#nullable enable
 
 namespace PingTestTool
 {
@@ -128,8 +117,13 @@ namespace PingTestTool
         {
             _graphWindow?.Close();
             _traceWindow?.Close();
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
+
+            // Добавляем проверку на null и IsCancellationRequested
+            if (_cancellationTokenSource is { IsCancellationRequested: false })
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
+            }
         }
 
         public async Task HandlePingButtonClickAsync()
@@ -187,16 +181,9 @@ namespace PingTestTool
             if (int.TryParse(_txtPingCount.Text, out int pingCount) &&
                 int.TryParse(_txtTimeout.Text, out int timeout))
             {
-                _txtResults.Clear();
-                await _pingService.ClearRoundtripTimesAsync();
-
+                await _pingService.ClearRoundtripTimesAsync().ConfigureAwait(false);
                 var config = new PingService.PingConfiguration(_txtURL.Text, pingCount, timeout);
-                Log.Information("[MainWindow] Начинаем пинг-тест с конфигурацией: {Config}", config);
-                await _pingService.StartPingTestAsync(config, _cancellationTokenSource!.Token);
-            }
-            else
-            {
-                Log.Warning("[MainWindow] Не удалось распарсить количество пакетов или таймаут.");
+                await _pingService.StartPingTestAsync(config, _cancellationTokenSource!.Token).ConfigureAwait(false);
             }
         }
 
@@ -301,7 +288,7 @@ namespace PingTestTool
             if (_graphWindow?.WindowState == WindowState.Minimized)
             {
                 _graphWindow.WindowState = WindowState.Normal;
-                _graphWindow.Activate();
+                _graphWindow?.Activate();
                 Log.Information("[MainWindow] Восстанавливаем окно графика из минимизированного состояния.");
             }
             else
@@ -364,6 +351,13 @@ namespace PingTestTool
         public MainWindow()
         {
             InitializeComponent();
+
+            AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+            {
+                var exception = eventArgs.ExceptionObject as Exception;
+                Log.Fatal(exception, "Unhandled exception");
+                MessageBox.Show($"Критическая ошибка: {exception?.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            };
 
             _warningManager = new WarningManager(
                 imgWarning, imgWarning_1, imgWarning_3

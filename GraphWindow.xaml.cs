@@ -1,333 +1,260 @@
-﻿using OxyPlot;
-using OxyPlot.Annotations;
-using OxyPlot.Axes;
-using OxyPlot.Series;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Threading;
-
-#nullable enable
+﻿#nullable enable
 
 namespace PingTestTool
 {
-    public partial class GraphWindow : Window, IDisposable, INotifyPropertyChanged
+    public static class Defaults
     {
-        #region Fields
-        private readonly GraphDataManager _dataManager = new();
+        public const int MaxVisiblePoints = 100;
+        public const int MinPingInterval = 100;
+    }
+
+    public partial class GraphWindow : Window, INotifyPropertyChanged, IDisposable
+    {
+        private readonly GraphManager _graphManager;
+        private readonly StatisticsManager _statisticsManager;
         private readonly DispatcherTimer _updateTimer;
-        private readonly LinearAxis _pingAxis;
-        private readonly DateTimeAxis _timeAxis;
-        private readonly LineSeries _errorSeries;
-        private readonly LineSeries _normalSeries;
-        private readonly AreaSeries _thresholdSeries;
-        private readonly Queue<TimestampedData> _realtimeData = new();
+        private volatile int _maxVisiblePoints = Defaults.MaxVisiblePoints;
 
-        private int _maxVisiblePoints = GraphTools.Defaults.MAX_VISIBLE_POINTS;
-        private bool _isSmoothingEnabled;
-        private bool _isAutoScrollEnabled = true;
-        private bool _isPaused;
-        private bool _isLogarithmicScale;
-        private double _zoomLevel = 1.0;
-        private double _warningThreshold = 100;
-        private double _criticalThreshold = 200;
-        #endregion
-
-        #region Properties
-        public PlotModel PingPlotModel { get; } = new()
-        {
-            Title = GraphTools.Defaults.GRAPH_TITLE,
-            Background = OxyColors.White
-        };
-
-        public bool IsAutoScrollEnabled
-        {
-            get => _isAutoScrollEnabled;
-            set => SetProperty(ref _isAutoScrollEnabled, value);
-        }
-
-        public bool IsSmoothingEnabled
-        {
-            get => _isSmoothingEnabled;
-            set => SetProperty(ref _isSmoothingEnabled, value);
-        }
-
-        public double WarningThreshold
-        {
-            get => _warningThreshold;
-            set => SetProperty(ref _warningThreshold, value, UpdateThresholdLines);
-        }
-
-        public double CriticalThreshold
-        {
-            get => _criticalThreshold;
-            set => SetProperty(ref _criticalThreshold, value, UpdateThresholdLines);
-        }
-
-        public TimeSpan DataRetentionPeriod { get; set; } = TimeSpan.FromHours(1);
-
-        public List<int> MaxVisiblePointsOptions { get; } = new() { 100, 200, 500, 1000 };
-
-        public double ZoomLevel
-        {
-            get => _zoomLevel;
-            set => SetProperty(ref _zoomLevel, value, () => UpdateGraph(null, EventArgs.Empty));
-        }
+        public PlotModel PingPlotModel { get; }
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         public int MaxVisiblePoints
         {
             get => _maxVisiblePoints;
-            set => SetProperty(ref _maxVisiblePoints, value, () => UpdateGraph(null, EventArgs.Empty));
+            set
+            {
+                int currentValue = _maxVisiblePoints;
+                if (currentValue != value && value > 0 &&
+                    Interlocked.CompareExchange(ref _maxVisiblePoints, value, currentValue) == currentValue)
+                {
+                    OnPropertyChanged();
+                    _graphManager.UpdateGraph(_maxVisiblePoints);
+                }
+            }
         }
-        #endregion
 
-        #region Constructor
         public GraphWindow(int pingInterval)
         {
             InitializeComponent();
             DataContext = this;
 
-            (_timeAxis, _pingAxis) = GraphSettings.InitializeAxes();
-            (_normalSeries, _errorSeries, _thresholdSeries) = GraphSettings.InitializeSeries();
-            _updateTimer = GraphSettings.InitializeTimer(pingInterval, UpdateGraph);
-            InitializePlotModel();
+            PingPlotModel = new PlotModel
+            {
+                Title = "График по времени отклика для Ping",
+                Background = OxyColors.White
+            };
+
+            _graphManager = new GraphManager(PingPlotModel, UpdateTextFields);
+            _statisticsManager = new StatisticsManager();
+
+            _updateTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(Math.Max(pingInterval, Defaults.MinPingInterval))
+            };
+
+            _updateTimer.Tick += (_, _) =>
+            {
+                if (Application.Current?.Dispatcher != null)
+                {
+                    Application.Current.Dispatcher.Invoke(() => _graphManager.UpdateGraph(_maxVisiblePoints));
+                }
+            };
+
+            _updateTimer.Start();
         }
-        #endregion
 
-        #region Initialization
-        private void InitializePlotModel()
+        public void SetPingData(IEnumerable<int>? data)
         {
-            PingPlotModel.Axes.Add(_timeAxis);
-            PingPlotModel.Axes.Add(_pingAxis);
-            PingPlotModel.Series.Add(_thresholdSeries);
-            PingPlotModel.Series.Add(_normalSeries);
-            PingPlotModel.Series.Add(_errorSeries);
-            PingPlotModel.Legends.Add(new OxyPlot.Legends.Legend
+            if (data == null || !data.Any())
             {
-                LegendPosition = OxyPlot.Legends.LegendPosition.TopRight,
-                LegendPlacement = OxyPlot.Legends.LegendPlacement.Inside
-            });
-
-            var plotView = this.plotView;
-            if (plotView == null)
-            {
-                Log.Error("plotView is null during SetupEventHandlers.");
+                Log.Warning("Пустые или нулевые данные получены для пинга.");
                 return;
             }
 
-            var controller = new PlotController();
-            controller.BindMouseDown(OxyMouseButton.Right, new DelegatePlotCommand<OxyMouseDownEventArgs>((model, view, args) =>
-            {
-                if (args.ChangedButton == OxyMouseButton.Right)
-                {
-                    args.Handled = true;
-                    ShowContextMenu(args);
-                }
-            }));
-            plotView.Controller = controller;
+            _statisticsManager.SetPingData(data);
+            _graphManager.SetData(data);
+            _graphManager.UpdateGraph(MaxVisiblePoints);
         }
-        #endregion
 
-        #region Update Methods
-        private async void UpdateGraph(object? sender, EventArgs e)
+        private void UpdateTextFields(string min, string avg, string max, string cur)
         {
-            if (_isPaused) return;
-            try
-            {
-                var now = DateTime.Now;
-                CleanupOldData(now);
-                var dataToPlot = await Task.Run(() => _dataManager.GetDataToPlot(_isSmoothingEnabled));
-                UpdateSeriesData(dataToPlot, now);
-                UpdateAxesRanges(now);
-                UpdatePingStatistics();
-                UpdateThresholdLines();
-                if (_isAutoScrollEnabled) AutoScrollGraph();
-                PingPlotModel.InvalidatePlot(true);
-            }
-            catch (Exception ex) { Log.Error(ex, "Ошибка обновления графика"); }
+            txtMin.Text = min;
+            txtAvg.Text = avg;
+            txtMax.Text = max;
+            txtCur.Text = cur;
         }
 
-        private void CleanupOldData(DateTime now) => GraphTools.CleanupOldData(_realtimeData, now - DataRetentionPeriod);
-
-        private void UpdatePingStatistics()
-        {
-            var stats = _dataManager.GetStatistics();
-            Dispatcher.Invoke(() =>
-            {
-                txtMin.Text = $"{stats.Min:F1}";
-                txtAvg.Text = $"{stats.Avg:F1}";
-                txtMax.Text = $"{stats.Max:F1}";
-                txtCur.Text = $"{stats.Cur:F1}";
-            });
-        }
-
-        private void UpdateSeriesData(IReadOnlyList<double> data, DateTime now)
-        {
-            _normalSeries.Points.Clear();
-            _errorSeries.Points.Clear();
-            PingPlotModel.Annotations.Clear();
-
-            int startIndex = Math.Max(0, _realtimeData.Count - MaxVisiblePoints);
-            var visibleData = _realtimeData.Skip(startIndex).ToList();
-
-            foreach (var point in visibleData)
-            {
-                var oxyTime = DateTimeAxis.ToDouble(point.Timestamp);
-                if (point.Value <= 0) AddErrorPoint(new DataPoint(oxyTime, point.Value));
-                else _normalSeries.Points.Add(new DataPoint(oxyTime, point.Value));
-            }
-        }
-
-        private void AddErrorPoint(DataPoint point)
-        {
-            _errorSeries.Points.Add(point);
-            PingPlotModel.Annotations.Add(new TextAnnotation
-            {
-                Text = "Ошибка",
-                TextPosition = point,
-                TextColor = OxyColors.Red,
-                FontSize = 10,
-                FontWeight = OxyPlot.FontWeights.Bold
-            });
-        }
-
-        private void UpdateAxesRanges(DateTime now)
-        {
-            if (_realtimeData.Count == 0) return;
-            var visibleDuration = TimeSpan.FromSeconds(30 * ZoomLevel);
-            _timeAxis.Minimum = DateTimeAxis.ToDouble(now - visibleDuration);
-            _timeAxis.Maximum = DateTimeAxis.ToDouble(now);
-            _pingAxis.StringFormat = _isLogarithmicScale ? "0.##E0" : "0.##";
-            _pingAxis.UseSuperExponentialFormat = _isLogarithmicScale;
-        }
-
-        private void UpdateThresholdLines() => GraphTools.UpdateThresholdSeries(_thresholdSeries, _warningThreshold, _criticalThreshold, DateTime.Now - DataRetentionPeriod, DateTime.Now);
-
-        private void AutoScrollGraph()
-        {
-            if (_realtimeData.Count > GraphTools.Defaults.AUTOSCROLL_THRESHOLD)
-            {
-                var latest = _realtimeData.Last().Timestamp;
-                _timeAxis.Minimum = DateTimeAxis.ToDouble(latest.AddSeconds(-30));
-                _timeAxis.Maximum = DateTimeAxis.ToDouble(latest.AddSeconds(1));
-            }
-        }
-        #endregion
-
-        #region Public Methods
-        public void SetPingData(List<int> pingData)
-        {
-            try
-            {
-                if (pingData == null)
-                {
-                    Log.Warning("Received null pingData in SetPingData.");
-                    return;
-                }
-
-                foreach (var value in pingData) _realtimeData.Enqueue(new TimestampedData(DateTime.Now, value));
-                _dataManager.SetPingData(pingData);
-                UpdateGraph(null, EventArgs.Empty);
-            }
-            catch (Exception ex) { Log.Error(ex, "Ошибка инициализации"); }
-        }
-
-        public void TogglePause()
-        {
-            _isPaused = !_isPaused;
-            Log.Information("TogglePause called. IsPaused: {IsPaused}", _isPaused);
-        }
-
-        public void SetRefreshRate(int milliseconds)
-        {
-            if (milliseconds < 100)
-            {
-                Log.Error("Частота обновления не может быть меньше 100 мс. Получено: {Milliseconds}", milliseconds);
-                throw new ArgumentException("Частота обновления не может быть меньше 100 мс", nameof(milliseconds));
-            }
-
-            _updateTimer.Interval = TimeSpan.FromMilliseconds(milliseconds);
-            Log.Information("Refresh rate set to {Milliseconds} ms", milliseconds);
-        }
-        #endregion
-
-        #region Context Menu
-        private void ShowContextMenu(OxyMouseDownEventArgs e)
-        {
-            if (e == null)
-            {
-                Log.Warning("ShowContextMenu called with null OxyMouseDownEventArgs.");
-                return;
-            }
-
-            var menu = new ContextMenu();
-            var logScaleItem = new MenuItem
-            {
-                Header = "Логарифмическая шкала",
-                IsCheckable = true,
-                IsChecked = _isLogarithmicScale
-            };
-
-            logScaleItem.Click += (s, args) =>
-            {
-                _isLogarithmicScale = !_isLogarithmicScale;
-                Log.Information("Logarithmic scale toggled. IsLogarithmicScale: {IsLogarithmicScale}", _isLogarithmicScale);
-                UpdateGraph(null, EventArgs.Empty);
-            };
-
-            menu.Items.Add(new Separator());
-            menu.Items.Add(logScaleItem);
-            menu.IsOpen = true;
-        }
-        #endregion
-
-        #region UI Interaction
-        public string PauseButtonContent => _isPaused ? "Продолжить" : "Пауза";
-
-        private void OnTogglePauseClick(object sender, RoutedEventArgs e)
-        {
-            TogglePause();
-            OnPropertyChanged(nameof(PauseButtonContent));
-            Log.Information("Pause button clicked. New state: {PauseButtonContent}", PauseButtonContent);
-        }
-        #endregion
-
-        #region IDisposable Implementation
-        public void Dispose()
-        {
-            try
-            {
-                _updateTimer?.Stop();
-                _dataManager?.Dispose();
-                Log.Information("GraphWindow resources have been disposed.");
-            }
-            catch (Exception ex) { Log.Error(ex, "Error during disposing of GraphWindow resources."); }
-        }
-        #endregion
-
-        #region INotifyPropertyChanged Implementation
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected void OnPropertyChanged(string propertyName)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            Log.Debug("Property changed: {PropertyName}", propertyName);
         }
 
-        private void SetProperty<T>(ref T field, T value, Action? onChanged = null)
+        public void Dispose()
         {
-            if (!EqualityComparer<T>.Default.Equals(field, value))
+            _updateTimer.Stop();
+            _graphManager.Dispose();
+            _statisticsManager.Dispose();
+        }
+    }
+
+    public class GraphManager : IDisposable
+    {
+        private readonly PlotModel _plotModel;
+        private readonly Action<string, string, string, string> _updateTextFields;
+        private readonly ConcurrentDictionary<DateTime, double> _realtimeData = new();
+        private readonly StatisticsManager _statisticsManager;
+        private readonly LineSeries _normalSeries;
+        private readonly object _lock = new();
+        private bool _disposed;
+
+        public GraphManager(PlotModel plotModel, Action<string, string, string, string> updateTextFields)
+        {
+            _plotModel = plotModel;
+            _updateTextFields = updateTextFields;
+            _statisticsManager = new StatisticsManager();
+
+            _normalSeries = new LineSeries
             {
-                field = value;
-                onChanged?.Invoke();
-                OnPropertyChanged(nameof(field));
+                Title = "Ping",
+                Color = OxyColor.FromRgb(0, 114, 189),
+                MarkerType = MarkerType.Circle,
+                MarkerSize = 3,
+                MarkerStroke = OxyColor.FromRgb(0, 114, 189),
+                MarkerFill = OxyColors.White,
+            };
+
+            InitializeGraphComponents();
+        }
+
+        private void InitializeGraphComponents()
+        {
+            _plotModel.Axes.Add(new DateTimeAxis
+            {
+                Position = AxisPosition.Bottom,
+                Title = "Время",
+                StringFormat = "HH:mm:ss",
+            });
+
+            _plotModel.Axes.Add(new LinearAxis
+            {
+                Position = AxisPosition.Left,
+                Title = "Время отклика (мс)",
+                AbsoluteMinimum = 0,
+            });
+
+            _plotModel.Series.Add(_normalSeries);
+        }
+
+        public void UpdateGraph(int maxVisiblePoints)
+        {
+            if (_realtimeData.IsEmpty)
+            {
+                Log.Warning("Нет данных для обновления графика.");
+                return;
+            }
+
+            List<DataPoint> sortedData;
+
+            lock (_lock)
+            {
+                sortedData = _realtimeData
+                    .OrderBy(kvp => kvp.Key)
+                    .Skip(Math.Max(0, _realtimeData.Count - maxVisiblePoints))
+                    .Select(kvp => new DataPoint(DateTimeAxis.ToDouble(kvp.Key), kvp.Value))
+                    .Where(dp => dp.Y > 0)
+                    .ToList();
+            }
+
+            _normalSeries.Points.Clear();
+            _normalSeries.Points.AddRange(sortedData);
+
+            var stats = _statisticsManager.GetStatistics();
+            _updateTextFields(
+                $"{stats.Min:F1}",
+                $"{stats.Avg:F1}",
+                $"{stats.Max:F1}",
+                $"{stats.Cur:F1}"
+            );
+
+            _plotModel.InvalidatePlot(true);
+        }
+
+        public void SetData(IEnumerable<int> data)
+        {
+            var timestamp = DateTime.Now;
+
+            lock (_lock)
+            {
+                foreach (var value in data.Where(x => x > 0))
+                {
+                    _realtimeData[timestamp] = value;
+
+                    while (_realtimeData.Count > Defaults.MaxVisiblePoints)
+                    {
+                        var oldestKey = _realtimeData.Keys.Min();
+                        _realtimeData.TryRemove(oldestKey, out _);
+                    }
+                }
+            }
+
+            Log.Information("Graph data updated. Current data count: {Count}", _realtimeData.Count);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+
+            lock (_lock)
+            {
+                _realtimeData.Clear();
+            }
+
+            _statisticsManager.Dispose();
+            _disposed = true;
+        }
+    }
+
+    public class StatisticsManager : IDisposable
+    {
+        private ConcurrentQueue<int> _pingData = new();
+        private int _maxDataPoints = Defaults.MaxVisiblePoints;
+        private bool _disposed;
+
+        public void SetPingData(IEnumerable<int> data)
+        {
+            foreach (var value in data.Where(x => x > 0))
+            {
+                _pingData.Enqueue(value);
+                while (_pingData.Count > _maxDataPoints)
+                {
+                    _pingData.TryDequeue(out _);
+                }
             }
         }
-        #endregion
+
+        public PingStatistics GetStatistics()
+        {
+            if (!_pingData.Any())
+                return new PingStatistics(0, 0, 0, 0);
+
+            var dataArray = _pingData.ToArray();
+
+            return new PingStatistics(
+                dataArray.Min(),
+                dataArray.Average(),
+                dataArray.Max(),
+                dataArray.Last()
+            );
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+
+            while (_pingData.TryDequeue(out _)) { }
+            _disposed = true;
+        }
     }
+
+    public readonly record struct PingStatistics(double Min, double Avg, double Max, double Cur);
 }

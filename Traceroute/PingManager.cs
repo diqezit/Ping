@@ -1,12 +1,4 @@
-﻿using Serilog;
-using System;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Net.NetworkInformation;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace PingTestTool
+﻿namespace PingTestTool
 {
     public class PingManager : IPingManager
     {

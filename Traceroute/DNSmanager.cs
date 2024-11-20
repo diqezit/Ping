@@ -1,12 +1,4 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using Serilog;
-using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace PingTestTool
+﻿namespace PingTestTool
 {
     public class DnsManager : IDnsManager
     {

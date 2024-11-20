@@ -1,15 +1,4 @@
-﻿using Microsoft.Win32;
-using Serilog;
-using System;
-using System.ComponentModel;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Data;
-using System.Windows.Media;
-
-#nullable enable
+﻿#nullable enable
 
 namespace PingTestTool
 {

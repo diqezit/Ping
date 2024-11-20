@@ -1,8 +1,4 @@
-﻿using System.IO;
-using System.Windows;
-using Serilog;
-
-namespace Пингалятор
+﻿namespace Пингалятор
 {
     /// <summary>
     /// Логика взаимодействия для App.xaml
