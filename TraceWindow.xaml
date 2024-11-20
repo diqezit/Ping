@@ -1,0 +1,63 @@
+﻿<Window x:Class="PingTestTool.TraceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Трассировка маршрута"
+        Width="800" Height="600"
+        MinWidth="800" MinHeight="600"
+        Background="#1E1E1E"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+
+    <Grid>
+        <!-- Заголовок окна с тенью -->
+        <Border Background="#007ACC" Height="50" VerticalAlignment="Top">
+            <Border.Effect>
+                <DropShadowEffect ShadowDepth="2" BlurRadius="5" Opacity="0.5"/>
+            </Border.Effect>
+            <TextBlock Text="Трассировка маршрута" Foreground="White" FontSize="20" FontWeight="Bold" VerticalAlignment="Center" Margin="20,0"/>
+        </Border>
+
+        <!-- Основное содержимое с разделением на строки -->
+        <Grid Margin="0,60,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Статус -->
+                <RowDefinition Height="*"/>
+                <!-- Таблица результатов -->
+                <RowDefinition Height="Auto"/>
+                <!-- Кнопки управления -->
+            </Grid.RowDefinitions>
+
+            <!-- Статус -->
+            <Border Background="#2D2D30" Padding="10" Margin="10,10,10,0" Grid.Row="0">
+                <TextBlock x:Name="StatusTextBlock" FontWeight="Bold" HorizontalAlignment="Center" FontSize="16" Foreground="#FF5555"/>
+            </Border>
+
+            <!-- Таблица результатов -->
+            <DataGrid x:Name="ResultsList" AutoGenerateColumns="False" Grid.Row="1" Margin="10"
+                      CanUserAddRows="False" CanUserDeleteRows="False" IsReadOnly="True"
+                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Nr" Binding="{Binding Nr}" Width="40"/>
+                    <DataGridTextColumn Header="IP Address" Binding="{Binding IPAddress}" Width="130"/>
+                    <DataGridTextColumn Header="Domain Name" Binding="{Binding DomainName}" Width="*"/>
+                    <DataGridTextColumn Header="Loss" Binding="{Binding Loss}" Width="60"/>
+                    <DataGridTextColumn Header="Sent" Binding="{Binding Sent}" Width="60"/>
+                    <DataGridTextColumn Header="Recv" Binding="{Binding Received}" Width="60"/>
+                    <DataGridTextColumn Header="Best" Binding="{Binding Best}" Width="60"/>
+                    <DataGridTextColumn Header="Last" Binding="{Binding Last}" Width="60"/>
+                    <DataGridTextColumn Header="Avrg" Binding="{Binding Avrg}" Width="60"/>
+                    <DataGridTextColumn Header="Wrst" Binding="{Binding Wrst}" Width="60"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- Кнопки управления -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Grid.Row="2" Margin="0,10,0,20">
+                <Button x:Name="btnStartTrace" Content="Начать трассировку" Style="{StaticResource ButtonStyle}" Click="BtnStartTrace_Click" Margin="5,0"/>
+                <Button x:Name="btnStopTrace" Content="Остановить трассировку" Style="{StaticResource ButtonStyle}" Click="BtnStopTrace_Click" IsEnabled="False" Margin="5,0"/>
+                <Button x:Name="btnClearResults" Content="Очистить результаты" Style="{StaticResource ButtonStyle}" Click="BtnClearResults_Click" Margin="5,0"/>
+                <Button x:Name="btnSaveResults" Content="Сохранить результаты" Style="{StaticResource ButtonStyle}" Click="BtnSaveResults_Click" Margin="5,0"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
