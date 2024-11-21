@@ -23,12 +23,12 @@ namespace PingTestTool
             get => _maxVisiblePoints;
             set
             {
-                int currentValue = _maxVisiblePoints;
-                if (currentValue != value && value > 0 &&
-                    Interlocked.CompareExchange(ref _maxVisiblePoints, value, currentValue) == currentValue)
+                if (Interlocked.CompareExchange(ref _maxVisiblePoints, value, _maxVisiblePoints) == _maxVisiblePoints)
                 {
                     OnPropertyChanged();
-                    _graphManager.UpdateGraph(_maxVisiblePoints);
+                    _graphManager.UpdateMaxVisiblePoints(value);
+                    _statisticsManager.UpdateMaxVisiblePoints(value);
+                    _graphManager.UpdateGraph(value);
                 }
             }
         }
@@ -54,10 +54,7 @@ namespace PingTestTool
 
             _updateTimer.Tick += (_, _) =>
             {
-                if (Application.Current?.Dispatcher != null)
-                {
-                    Application.Current.Dispatcher.Invoke(() => _graphManager.UpdateGraph(_maxVisiblePoints));
-                }
+                Application.Current.Dispatcher.Invoke(() => _graphManager.UpdateGraph(_maxVisiblePoints));
             };
 
             _updateTimer.Start();
@@ -106,6 +103,7 @@ namespace PingTestTool
         private readonly LineSeries _normalSeries;
         private readonly object _lock = new();
         private bool _disposed;
+        private int _maxVisiblePoints = Defaults.MaxVisiblePoints;
 
         public GraphManager(PlotModel plotModel, Action<string, string, string, string> updateTextFields)
         {
@@ -143,6 +141,24 @@ namespace PingTestTool
             });
 
             _plotModel.Series.Add(_normalSeries);
+        }
+
+        public void UpdateMaxVisiblePoints(int maxVisiblePoints)
+        {
+            _maxVisiblePoints = maxVisiblePoints;
+            TrimDataToMaxVisiblePoints();
+        }
+
+        private void TrimDataToMaxVisiblePoints()
+        {
+            lock (_lock)
+            {
+                while (_realtimeData.Count > _maxVisiblePoints)
+                {
+                    var oldestKey = _realtimeData.Keys.Min();
+                    _realtimeData.TryRemove(oldestKey, out _);
+                }
+            }
         }
 
         public void UpdateGraph(int maxVisiblePoints)
@@ -189,11 +205,7 @@ namespace PingTestTool
                 {
                     _realtimeData[timestamp] = value;
 
-                    while (_realtimeData.Count > Defaults.MaxVisiblePoints)
-                    {
-                        var oldestKey = _realtimeData.Keys.Min();
-                        _realtimeData.TryRemove(oldestKey, out _);
-                    }
+                    TrimDataToMaxVisiblePoints();
                 }
             }
 
@@ -220,15 +232,26 @@ namespace PingTestTool
         private int _maxDataPoints = Defaults.MaxVisiblePoints;
         private bool _disposed;
 
+        public void UpdateMaxVisiblePoints(int maxVisiblePoints)
+        {
+            _maxDataPoints = maxVisiblePoints;
+            TrimDataToMaxVisiblePoints();
+        }
+
+        private void TrimDataToMaxVisiblePoints()
+        {
+            while (_pingData.Count > _maxDataPoints)
+            {
+                _pingData.TryDequeue(out _);
+            }
+        }
+
         public void SetPingData(IEnumerable<int> data)
         {
             foreach (var value in data.Where(x => x > 0))
             {
                 _pingData.Enqueue(value);
-                while (_pingData.Count > _maxDataPoints)
-                {
-                    _pingData.TryDequeue(out _);
-                }
+                TrimDataToMaxVisiblePoints();
             }
         }
 

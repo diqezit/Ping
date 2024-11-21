@@ -70,38 +70,16 @@ namespace PingTestTool
         private GraphWindow? _graphWindow;
         private TraceWindow? _traceWindow;
 
-        private readonly TextBox _txtResults;
-        private readonly TextBox _txtURL;
-        private readonly TextBox _txtPingCount;
-        private readonly TextBox _txtTimeout;
-        private readonly Button _btnPing;
-        private readonly Button _btnStop;
-        private readonly ProgressBar _progressBar;
-
         public MainWindowEventHandler(
             MainWindow mainWindow,
             PingService pingService,
             InputValidator inputValidator,
-            WarningManager warningManager,
-            TextBox txtResults,
-            TextBox txtURL,
-            TextBox txtPingCount,
-            TextBox txtTimeout,
-            Button btnPing,
-            Button btnStop,
-            ProgressBar progressBar)
+            WarningManager warningManager)
         {
             _mainWindow = mainWindow;
             _pingService = pingService;
             _inputValidator = inputValidator;
             _warningManager = warningManager;
-            _txtResults = txtResults;
-            _txtURL = txtURL;
-            _txtPingCount = txtPingCount;
-            _txtTimeout = txtTimeout;
-            _btnPing = btnPing;
-            _btnStop = btnStop;
-            _progressBar = progressBar;
 
             InitializePingService();
         }
@@ -115,14 +93,21 @@ namespace PingTestTool
 
         public void HandleWindowClosed(object? sender, EventArgs e)
         {
-            _graphWindow?.Close();
-            _traceWindow?.Close();
-
-            // Добавляем проверку на null и IsCancellationRequested
-            if (_cancellationTokenSource is { IsCancellationRequested: false })
+            if (sender == _mainWindow)
             {
-                _cancellationTokenSource.Cancel();
-                _cancellationTokenSource.Dispose();
+                _graphWindow?.Close();
+                _traceWindow?.Close();
+
+                if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+                {
+                    _cancellationTokenSource.Cancel();
+                    _cancellationTokenSource.Dispose();
+                }
+                _cancellationTokenSource = null;
+            }
+            else if (sender is GraphWindow)
+            {
+                _graphWindow = null; 
             }
         }
 
@@ -130,14 +115,15 @@ namespace PingTestTool
         {
             try
             {
-                if (_btnPing.Content.ToString() == MainWindow.BTN_START_TEXT)
+                if (_mainWindow.btnPing.Content.ToString() == MainWindow.BTN_START_TEXT)
                 {
+                    Log.Information("[MainWindow] Нажата кнопка 'Запустить тест'.");
                     _warningManager.HideAllWarnings();
 
                     var validationResult = _inputValidator.ValidateInput(
-                        _txtURL.Text,
-                        _txtPingCount.Text,
-                        _txtTimeout.Text
+                        _mainWindow.txtURL.Text,
+                        _mainWindow.txtPingCount.Text,
+                        _mainWindow.txtTimeout.Text
                     );
 
                     if (validationResult.IsValid)
@@ -152,9 +138,14 @@ namespace PingTestTool
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                Log.Information("[MainWindow] Пинг-тест был отменен.");
+            }
             catch (Exception ex)
             {
                 Log.Error(ex, "[MainWindow] Произошла ошибка при выполнении пинг-теста");
+                MessageBox.Show($"Произошла ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -169,6 +160,10 @@ namespace PingTestTool
                 Log.Information("[MainWindow] Начинаем выполнение пинг-теста.");
                 await ExecutePingTestCore();
             }
+            catch (OperationCanceledException)
+            {
+                Log.Information("[MainWindow] Пинг-тест был отменен.");
+            }
             finally
             {
                 Log.Information("[MainWindow] Завершаем выполнение пинг-теста.");
@@ -178,36 +173,49 @@ namespace PingTestTool
 
         private async Task ExecutePingTestCore()
         {
-            if (int.TryParse(_txtPingCount.Text, out int pingCount) &&
-                int.TryParse(_txtTimeout.Text, out int timeout))
+            if (_mainWindow == null || _pingService == null || _cancellationTokenSource == null)
+            {
+                Log.Error("[MainWindow] Один или несколько необходимых компонентов недействительны.");
+                return;
+            }
+
+            if (int.TryParse(_mainWindow.txtPingCount.Text, out int pingCount) &&
+                int.TryParse(_mainWindow.txtTimeout.Text, out int timeout))
             {
                 await _pingService.ClearRoundtripTimesAsync().ConfigureAwait(false);
-                var config = new PingService.PingConfiguration(_txtURL.Text, pingCount, timeout);
-                await _pingService.StartPingTestAsync(config, _cancellationTokenSource!.Token).ConfigureAwait(false);
+                var config = new PingService.PingConfiguration(_mainWindow.txtURL.Text, pingCount, timeout);
+                try
+                {
+                    await _pingService.StartPingTestAsync(config, _cancellationTokenSource.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    Log.Information("[MainWindow] Пинг-тест был отменен.");
+                }
             }
         }
 
         private void UpdateUIForTestStart()
         {
-            _btnPing.IsEnabled = false;
-            _btnStop.IsEnabled = true;
-            _btnPing.Content = MainWindow.BTN_WAIT_TEXT;
-            _progressBar.Value = 0;
+            _mainWindow.btnPing.IsEnabled = false;
+            _mainWindow.btnStop.IsEnabled = true;
+            _mainWindow.btnPing.Content = MainWindow.BTN_WAIT_TEXT;
+            _mainWindow.progressBar.Value = 0;
             Log.Information("[MainWindow] Обновляем UI для начала теста.");
         }
 
         private void ResetUIAfterTest()
         {
-            _btnPing.IsEnabled = true;
-            _btnPing.Content = MainWindow.BTN_START_TEXT;
-            _btnStop.IsEnabled = false;
-            _progressBar.Value = 0;
+            _mainWindow.btnPing.IsEnabled = true;
+            _mainWindow.btnPing.Content = MainWindow.BTN_START_TEXT;
+            _mainWindow.btnStop.IsEnabled = false;
+            _mainWindow.progressBar.Value = 0;
             Log.Information("[MainWindow] Сбрасываем UI после завершения теста.");
         }
 
         private void UpdateResults(string result)
         {
-            _mainWindow.Dispatcher.Invoke(() => _txtResults.AppendText(result));
+            _mainWindow.Dispatcher.Invoke(() => _mainWindow.txtResults.AppendText(result));
         }
 
         private void UpdateGraph(int roundtripTime)
@@ -217,7 +225,6 @@ namespace PingTestTool
                 if (_graphWindow != null && await _pingService.GetRoundtripTimesAsync() is List<int> roundtripTimes)
                 {
                     _graphWindow.SetPingData(roundtripTimes);
-                    Log.Information("[MainWindow] Обновляем график с данными: {RoundtripTimes}", roundtripTimes);
                 }
             });
         }
@@ -227,19 +234,16 @@ namespace PingTestTool
             _mainWindow.Dispatcher.Invoke(() =>
             {
                 double progress = (current * 100.0) / total;
-                _progressBar.Value = progress;
+                _mainWindow.progressBar.Value = progress;
                 Log.Information("[MainWindow] Обновляем прогресс бар: {Current}/{Total}", current, total);
             });
         }
 
         public void HandleStopButtonClick()
         {
-            if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
-            {
-                _cancellationTokenSource.Cancel();
-                ResetUIAfterTest();
-                Log.Information("[MainWindow] Останавливаем пинг-тест по запросу пользователя.");
-            }
+            _cancellationTokenSource?.Cancel();
+            ResetUIAfterTest();
+            Log.Information("[MainWindow] Останавливаем пинг-тест по запросу пользователя.");
         }
 
         public async Task HandleShowGraphButtonClickAsync()
@@ -259,7 +263,7 @@ namespace PingTestTool
 
         private void HandleGraphWindow(List<int> roundtripTimes)
         {
-            if (_graphWindow == null)
+            if (_graphWindow == null || !_graphWindow.IsLoaded)
             {
                 CreateNewGraphWindow(roundtripTimes);
                 Log.Information("[MainWindow] Создаем новое окно графика.");
@@ -273,22 +277,35 @@ namespace PingTestTool
 
         private void CreateNewGraphWindow(List<int> roundtripTimes)
         {
-            if (int.TryParse(_txtPingCount.Text, out int pingInterval))
+            if (int.TryParse(_mainWindow.txtPingCount.Text, out int pingInterval))
             {
                 _graphWindow = new GraphWindow(pingInterval);
-                _graphWindow.SetPingData(roundtripTimes);
-                _graphWindow.Closed += HandleWindowClosed;
-                _graphWindow.Show();
-                Log.Information("[MainWindow] Создано новое окно графика с интервалом: {PingInterval}", pingInterval);
+                if (_graphWindow != null)
+                {
+                    _graphWindow.SetPingData(roundtripTimes);
+                    _graphWindow.Closed += HandleWindowClosed;
+                    _graphWindow.Show();
+                    Log.Information("[MainWindow] Создано новое окно графика с интервалом: {PingInterval}", pingInterval);
+                }
+                else
+                {
+                    Log.Error("[MainWindow] Не удалось создать окно графика.");
+                }
             }
         }
 
         private void UpdateExistingGraphWindow(List<int> roundtripTimes)
         {
-            if (_graphWindow?.WindowState == WindowState.Minimized)
+            if (_graphWindow == null)
+            {
+                Log.Warning("[MainWindow] Графическое окно null. Невозможно обновить состояние окна или установить данные пинга.");
+                return;
+            }
+
+            if (_graphWindow.WindowState == WindowState.Minimized)
             {
                 _graphWindow.WindowState = WindowState.Normal;
-                _graphWindow?.Activate();
+                _graphWindow.Activate();
                 Log.Information("[MainWindow] Восстанавливаем окно графика из минимизированного состояния.");
             }
             else
@@ -297,12 +314,12 @@ namespace PingTestTool
                 Log.Information("[MainWindow] Минимизируем окно графика.");
             }
 
-            _graphWindow?.SetPingData(roundtripTimes);
+            _graphWindow.SetPingData(roundtripTimes);
         }
 
         public void HandleTraceRouteButtonClick()
         {
-            if (string.IsNullOrWhiteSpace(_txtURL.Text))
+            if (string.IsNullOrWhiteSpace(_mainWindow.txtURL.Text))
             {
                 MessageBox.Show(MainWindow.ERROR_NO_URL, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
                 Log.Warning("[MainWindow] Не указан URL для трассировки.");
@@ -317,7 +334,7 @@ namespace PingTestTool
         {
             if (_traceWindow == null || !_traceWindow.IsLoaded)
             {
-                _traceWindow = new TraceWindow(_txtURL.Text);
+                _traceWindow = new TraceWindow(_mainWindow.txtURL.Text);
                 _traceWindow.Closed += HandleWindowClosed;
                 _traceWindow.Show();
                 Log.Information("[MainWindow] Создано новое окно трассировки.");
@@ -337,12 +354,10 @@ namespace PingTestTool
         private readonly WarningManager _warningManager;
         private readonly PingService _pingService;
 
-        // Добавляем константы по умолчанию
         public const string DEFAULT_URL = "google.com";
         public const string DEFAULT_PING_COUNT = "4";
         public const string DEFAULT_TIMEOUT = "1000";
 
-        // Константы для UI
         public const string BTN_START_TEXT = "Запустить тест";
         public const string BTN_WAIT_TEXT = "Ожидаем...";
         public const string ERROR_NO_DATA = "Нет данных пинга для отображения.";
@@ -356,7 +371,8 @@ namespace PingTestTool
             {
                 var exception = eventArgs.ExceptionObject as Exception;
                 Log.Fatal(exception, "Unhandled exception");
-                MessageBox.Show($"Критическая ошибка: {exception?.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Критическая ошибка: {exception?.Message}", 
+                      "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
             };
 
             _warningManager = new WarningManager(
@@ -369,14 +385,7 @@ namespace PingTestTool
                 this,
                 _pingService,
                 _inputValidator,
-                _warningManager,
-                txtResults,
-                txtURL,
-                txtPingCount,
-                txtTimeout,
-                btnPing,
-                btnStop,
-                progressBar
+                _warningManager
             );
 
             this.Closed += _eventHandler.HandleWindowClosed;
