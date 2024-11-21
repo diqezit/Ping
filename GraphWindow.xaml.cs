@@ -204,7 +204,7 @@ namespace PingTestTool
 
             lock (_lock)
             {
-                foreach (var value in data.Where(x => x > 0)) 
+                foreach (var value in data.Where(x => x > 0))
                 {
                     _realtimeData[timestamp] = value;
                     TrimDataToMaxVisiblePoints();

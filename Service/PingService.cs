@@ -2,28 +2,99 @@
 
 namespace PingTestTool
 {
-    public sealed class PingService : IAsyncDisposable
-    {
-        #region Constants
 
+    public interface IPingConfiguration
+    {
+        string Url { get; }
+        int PingCount { get; }
+        int Timeout { get; }
+        bool DontFragment { get; }
+        void Validate();
+    }
+
+    public interface IPingTestResult
+    {
+        int SuccessfulPings { get; }
+        int FailedPings { get; }
+        TimeSpan ExecutionTime { get; }
+        double AverageJitter { get; }
+        IReadOnlyList<int> RoundtripTimes { get; }
+        string DetailedLog { get; }
+    }
+
+    public class PingConfiguration : IPingConfiguration
+    {
         private const int MIN_TIMEOUT = 100;
         private const int MAX_TIMEOUT = 60000;
         private const int MIN_PING_COUNT = 1;
         private const int MAX_PING_COUNT = 1000;
+
+        public string Url { get; }
+        public int PingCount { get; }
+        public int Timeout { get; }
+        public bool DontFragment { get; }
+
+        public PingConfiguration(string url, int pingCount, int timeout, bool dontFragment = true)
+        {
+            Url = url ?? throw new ArgumentNullException(nameof(url));
+            PingCount = pingCount;
+            Timeout = timeout;
+            DontFragment = dontFragment;
+            Validate();
+        }
+
+        public void Validate()
+        {
+            if (string.IsNullOrWhiteSpace(Url))
+            {
+                throw new ArgumentException("Url не может быть null или пустым.", nameof(Url));
+            }
+
+            if (PingCount is < MIN_PING_COUNT or > MAX_PING_COUNT)
+            {
+                throw new ArgumentException(
+                    $"Количество пингов должно быть между {MIN_PING_COUNT} и {MAX_PING_COUNT}.");
+            }
+
+            if (Timeout is < MIN_TIMEOUT or > MAX_TIMEOUT)
+            {
+                throw new ArgumentException(
+                    $"Таймаут должен быть между {MIN_TIMEOUT} и {MAX_TIMEOUT} мс.");
+            }
+        }
+    }
+
+    public class PingTestResult : IPingTestResult
+    {
+        public int SuccessfulPings { get; }
+        public int FailedPings { get; }
+        public TimeSpan ExecutionTime { get; }
+        public double AverageJitter { get; }
+        public IReadOnlyList<int> RoundtripTimes { get; }
+        public string DetailedLog { get; }
+
+        public PingTestResult(
+            int successfulPings,
+            int failedPings,
+            TimeSpan executionTime,
+            double averageJitter,
+            IReadOnlyList<int> roundtripTimes,
+            string detailedLog)
+        {
+            SuccessfulPings = successfulPings;
+            FailedPings = failedPings;
+            ExecutionTime = executionTime;
+            AverageJitter = averageJitter;
+            RoundtripTimes = roundtripTimes;
+            DetailedLog = detailedLog;
+        }
+    }
+
+    public sealed class PingService : IAsyncDisposable, IPingTestService
+    {
+        #region Constants
+
         private const int BUFFER_SIZE = 32;
-
-        #endregion
-
-        #region Fields
-
-        private readonly List<int> _roundtripTimes = new();
-        private readonly SemaphoreSlim _lock = new(1, 1);
-        private bool _isDisposed;
-
-        #endregion
-
-        #region Constants for Logging
-
         private const string LOG_SEPARATOR = "══════════════════════════════════════════════════════════";
         private const string LOG_MINI_SEPARATOR = "──────────────────────────────────────";
         private const string TIME_FORMAT = "HH:mm:ss";
@@ -31,42 +102,12 @@ namespace PingTestTool
 
         #endregion
 
-        #region Public Records
+        #region Fields
 
-        public record PingTestResult(
-            int SuccessfulPings,
-            int FailedPings,
-            TimeSpan ExecutionTime,
-            double AverageJitter,
-            IReadOnlyList<int> RoundtripTimes,
-            string DetailedLog);
-
-        public record PingConfiguration(
-            string Url,
-            int PingCount,
-            int Timeout,
-            bool DontFragment = true)
-        {
-            public void Validate()
-            {
-                if (string.IsNullOrWhiteSpace(Url))
-                {
-                    throw new ArgumentException("Url не может быть null или пустым.", nameof(Url));
-                }
-
-                if (PingCount is < MIN_PING_COUNT or > MAX_PING_COUNT)
-                {
-                    throw new ArgumentException(
-                        $"Количество пингов должно быть между {MIN_PING_COUNT} и {MAX_PING_COUNT}.");
-                }
-
-                if (Timeout is < MIN_TIMEOUT or > MAX_TIMEOUT)
-                {
-                    throw new ArgumentException(
-                        $"Таймаут должен быть между {MIN_TIMEOUT} и {MAX_TIMEOUT} мс.");
-                }
-            }
-        }
+        private readonly List<int> _roundtripTimes = new();
+        private readonly SemaphoreSlim _lock = new(1, 1);
+        private readonly ILoggingService _logger;
+        private bool _isDisposed;
 
         #endregion
 
@@ -78,14 +119,27 @@ namespace PingTestTool
 
         #endregion
 
+        #region Constructor
+
+        public PingService(ILoggingService? logger = null)
+        {
+            _logger = logger ?? new SerilogLoggingService();
+        }
+
+        #endregion
+
         #region Public Methods
 
-        public async Task<PingTestResult> StartPingTestAsync(
-            PingConfiguration config,
+        public async Task StartPingTestAsync(PingConfiguration config, CancellationToken cancellationToken = default)
+        {
+            await StartPingTestAsync((IPingConfiguration)config, cancellationToken);
+        }
+
+        public async Task<IPingTestResult> StartPingTestAsync(
+            IPingConfiguration config,
             CancellationToken cancellationToken = default)
         {
             await ThrowIfDisposedAsync(cancellationToken);
-            config.Validate();
 
             var startTime = DateTime.Now;
             var logBuilder = new StringBuilder();
@@ -123,15 +177,23 @@ namespace PingTestTool
             }
             catch (OperationCanceledException)
             {
-                Log.Information("Ping test was cancelled");
+                _logger.Information("Ping test was cancelled");
                 OnPingResult?.Invoke("Тест был остановлен." + Environment.NewLine);
                 throw;
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "Error during ping test execution");
+                _logger.Error(ex, "Error during ping test execution");
                 throw;
             }
+        }
+
+        public Task ClearRoundtripTimesAsync() => ClearRoundtripTimesAsync(CancellationToken.None);
+
+        public async Task<List<int>?> GetRoundtripTimesAsync()
+        {
+            var times = await GetRoundtripTimesAsync(CancellationToken.None);
+            return times.ToList();
         }
 
         public async Task<IReadOnlyList<int>> GetRoundtripTimesAsync(CancellationToken cancellationToken = default)
@@ -166,7 +228,10 @@ namespace PingTestTool
 
         #region Private Methods
 
-        private void InitializeLogBuilder(StringBuilder logBuilder, PingConfiguration config, DateTime startTime)
+        private void InitializeLogBuilder(
+            StringBuilder logBuilder,
+            IPingConfiguration config,
+            DateTime startTime)
         {
             var header = $"""
                 {LOG_SEPARATOR}
@@ -183,11 +248,11 @@ namespace PingTestTool
 
             logBuilder.Append(header);
             OnPingResult?.Invoke(header);
-            Log.Information("[PingService] Инициализация логгера для теста PING.");
+            _logger.Information("[PingService] Инициализация логгера для теста PING.");
         }
 
         private async Task<(int SuccessfulPings, int FailedPings)> ExecutePingTestsAsync(
-            PingConfiguration config,
+            IPingConfiguration config,
             StringBuilder responseTimes,
             CancellationToken cancellationToken)
         {
@@ -226,7 +291,8 @@ namespace PingTestTool
                 }
             }
 
-            Log.Information("[PingService] Выполнение пинг-тестов завершено. Успешных: {SuccessfulPings}, Неудачных: {FailedPings}", successfulPings, failedPings);
+            _logger.Information("[PingService] Выполнение пинг-тестов завершено. Успешных: {SuccessfulPings}, Неудачных: {FailedPings}",
+                successfulPings, failedPings);
             return (successfulPings, failedPings);
         }
 
@@ -250,7 +316,10 @@ namespace PingTestTool
                 var resultLine = FormatPingResult(reply, url, currentPing, totalPings);
                 OnPingResult?.Invoke(resultLine + Environment.NewLine);
 
-                Log.Information("[PingService] Пинг {CurrentPing}/{TotalPings} к {Url} завершен. Статус: {Status}, Время: {RoundtripTime} мс", currentPing, totalPings, url, reply.Status, reply.RoundtripTime);
+                _logger.Information(
+                    "[PingService] Пинг {CurrentPing}/{TotalPings} к {Url} завершен. Статус: {Status}, Время: {RoundtripTime} мс",
+                    currentPing, totalPings, url, reply.Status, reply.RoundtripTime);
+
                 return (reply.Status == IPStatus.Success,
                        (int)reply.RoundtripTime,
                        resultLine,
@@ -259,7 +328,11 @@ namespace PingTestTool
             catch (PingException ex)
             {
                 stopwatch.Stop();
-                Log.Error(ex, "[PingService] Ошибка пинга {CurrentPing}/{TotalPings} к {Url}", currentPing, totalPings, url);
+
+                _logger.Error(ex,
+                    "[PingService] Ошибка пинга {CurrentPing}/{TotalPings} к {Url}",
+                    currentPing, totalPings, url);
+
                 var errorMessage = FormatPingError(url, currentPing, totalPings, ex.Message);
                 OnPingResult?.Invoke(errorMessage + Environment.NewLine);
                 throw;
@@ -297,7 +370,7 @@ namespace PingTestTool
             {
                 _roundtripTimes.Add(roundtripTime);
                 OnRoundtripTimeAdded?.Invoke(roundtripTime);
-                Log.Information("[PingService] Добавлено время кругового пути: {RoundtripTime} мс", roundtripTime);
+                _logger.Information("[PingService] Добавлено время кругового пути: {RoundtripTime} мс", roundtripTime);
             }
             finally
             {
@@ -322,7 +395,7 @@ namespace PingTestTool
                 }
 
                 var avgJitter = Math.Round(totalJitter / (_roundtripTimes.Count - 1), 2);
-                Log.Information("[PingService] Рассчитан средний джиттер: {AvgJitter} мс", avgJitter);
+                _logger.Information("[PingService] Рассчитан средний джиттер: {AvgJitter} мс", avgJitter);
                 return avgJitter;
             }
             finally
@@ -332,15 +405,15 @@ namespace PingTestTool
         }
 
         private string GenerateFinalReport(
-            StringBuilder logBuilder,
-            StringBuilder responseTimes,
-            DateTime startTime,
-            DateTime endTime,
-            TimeSpan executionTime,
-            double avgJitter,
-            int successfulPings,
-            int failedPings,
-            int totalPings)
+                    StringBuilder logBuilder,
+                    StringBuilder responseTimes,
+                    DateTime startTime,
+                    DateTime endTime,
+                    TimeSpan executionTime,
+                    double avgJitter,
+                    int successfulPings,
+                    int failedPings,
+                    int totalPings)
         {
             var stats = CalculateStatistics();
             var lossPercentage = totalPings > 0
@@ -374,7 +447,7 @@ namespace PingTestTool
                      .AppendLine(summary);
 
             OnPingResult?.Invoke(summary);
-            Log.Information("[PingService] Сгенерирован итоговый отчет.");
+            _logger.Information("[PingService] Сгенерирован итоговый отчет.");
             return logBuilder.ToString();
         }
 
@@ -404,7 +477,7 @@ namespace PingTestTool
             }
 
             var avg = sum / _roundtripTimes.Count;
-            Log.Information("[PingService] Рассчитана статистика времени: Минимальное: {Min} мс, Максимальное: {Max} мс, Среднее: {Avg:F2} мс", min, max, avg);
+            _logger.Information("[PingService] Рассчитана статистика времени: Минимальное: {Min} мс, Максимальное: {Max} мс, Среднее: {Avg:F2} мс", min, max, avg);
             return (min, max, avg);
         }
 
@@ -433,10 +506,9 @@ namespace PingTestTool
                 _isDisposed = true;
 
                 GC.SuppressFinalize(this);
-                Log.Information("[PingService] Сервис пинга успешно освобожден.");
+                _logger.Information("[PingService] Сервис пинга успешно освобожден.");
             }
         }
-
         #endregion
     }
 }

@@ -51,15 +51,15 @@
 
         <!-- Количество пакетов -->
         <Label Content="К-во пакетов:" Style="{StaticResource LabelStyle}" Grid.Row="2"/>
-        <TextBox x:Name="txtPingCount" Text="{x:Static local:MainWindow.DEFAULT_PING_COUNT}" Style="{StaticResource TextBoxStyle}" 
-                 Grid.Row="2" Grid.Column="1" Margin="5"/>
+        <TextBox x:Name="txtPingCount" Text="10" Style="{StaticResource TextBoxStyle}" 
+         Grid.Row="2" Grid.Column="1" Margin="5"/>
         <Image x:Name="imgWarning_1" Source="Images/error.png" Visibility="Collapsed"
                Grid.Row="2" Grid.Column="2" Height="24" Width="24"/>
 
         <!-- Таймаут -->
         <Label Content="Таймаут (мс):" Style="{StaticResource LabelStyle}" Grid.Row="3"/>
-        <TextBox x:Name="txtTimeout" Text="{x:Static local:MainWindow.DEFAULT_TIMEOUT}" Style="{StaticResource TextBoxStyle}" 
-                 Grid.Row="3" Grid.Column="1" Margin="5"/>
+        <TextBox x:Name="txtTimeout" Text="1000" Style="{StaticResource TextBoxStyle}" 
+         Grid.Row="3" Grid.Column="1" Margin="5"/>
         <Image x:Name="imgWarning" Source="Images/warning.png" Visibility="Collapsed"
                Grid.Row="3" Grid.Column="2" Height="24" Width="24"/>
 
