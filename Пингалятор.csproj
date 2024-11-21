@@ -215,13 +215,15 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="MainWindow\MainWindowEventHandler.cs" />
     <Compile Include="Service\CompileService.cs" />
     <Compile Include="Service\GlobalUsings.cs" />
+    <Compile Include="Service\LoggingService.cs" />
     <Compile Include="Service\RelayCommand.cs" />
-    <Compile Include="Traceroute\DNSmanager.cs" />
-    <Compile Include="Traceroute\HopTraceResult.cs" />
+    <Compile Include="Traceroute\DNSManager.cs" />
+    <Compile Include="Traceroute\HopTraceManager.cs" />
     <Compile Include="Traceroute\PingManager.cs" />
-    <Compile Include="Service\PingService.cs" />
+    <Compile Include="MainWindow\PingService.cs" />
     <Compile Include="Traceroute\TraceManager.cs" />
     <Compile Include="TraceWindow.xaml.cs">
       <DependentUpon>TraceWindow.xaml</DependentUpon>

@@ -53,18 +53,18 @@
                        VerticalAlignment="Center" 
                        Margin="0,0,10,0"/>
 
-            <Slider Grid.Column="1" 
-                    Minimum="25" 
-                    Maximum="10000"
-                    Value="{Binding MaxVisiblePoints}"
-                    TickFrequency="25"
-                    IsSnapToTickEnabled="True"/>
+            <Slider Grid.Column="1"
+        Minimum="25"
+        Maximum="10000"
+        Value="{Binding MaxVisiblePoints, UpdateSourceTrigger=PropertyChanged}"
+        TickFrequency="25"
+        IsSnapToTickEnabled="True"/>
 
-            <TextBlock Grid.Column="2" 
-                       Foreground="White" 
-                       Text="{Binding MaxVisiblePoints}" 
-                       VerticalAlignment="Center" 
-                       Margin="10,0,0,0"/>
+            <TextBlock Grid.Column="2"
+           Foreground="White"
+           Text="{Binding MaxVisiblePoints}"
+           VerticalAlignment="Center"
+           Margin="10,0,0,0"/>
         </Grid>
     </Grid>
 </Window>

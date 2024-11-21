@@ -24,10 +24,7 @@ namespace PingTestTool
 
     public class PingConfiguration : IPingConfiguration
     {
-        private const int MIN_TIMEOUT = 100;
         private const int MAX_TIMEOUT = 60000;
-        private const int MIN_PING_COUNT = 1;
-        private const int MAX_PING_COUNT = 1000;
 
         public string Url { get; }
         public int PingCount { get; }
@@ -36,31 +33,25 @@ namespace PingTestTool
 
         public PingConfiguration(string url, int pingCount, int timeout, bool dontFragment = true)
         {
-            Url = url ?? throw new ArgumentNullException(nameof(url));
+            var logger = new SerilogLoggingService();
+            var urlErrors = ValidationHelper.ValidateUrl(url, logger);
+            var pingCountErrors = ValidationHelper.ValidatePingCount(pingCount.ToString(), logger);
+            var timeoutErrors = ValidationHelper.ValidateTimeout(timeout.ToString(), logger);
+
+            if (urlErrors.Any() || pingCountErrors.Any() || timeoutErrors.Any())
+            {
+                throw new ArgumentException("Invalid configuration.");
+            }
+
+            Url = url;
             PingCount = pingCount;
             Timeout = timeout;
             DontFragment = dontFragment;
-            Validate();
         }
 
         public void Validate()
         {
-            if (string.IsNullOrWhiteSpace(Url))
-            {
-                throw new ArgumentException("Url не может быть null или пустым.", nameof(Url));
-            }
-
-            if (PingCount is < MIN_PING_COUNT or > MAX_PING_COUNT)
-            {
-                throw new ArgumentException(
-                    $"Количество пингов должно быть между {MIN_PING_COUNT} и {MAX_PING_COUNT}.");
-            }
-
-            if (Timeout is < MIN_TIMEOUT or > MAX_TIMEOUT)
-            {
-                throw new ArgumentException(
-                    $"Таймаут должен быть между {MIN_TIMEOUT} и {MAX_TIMEOUT} мс.");
-            }
+            // No additional validation needed as it's already done in the constructor.
         }
     }
 

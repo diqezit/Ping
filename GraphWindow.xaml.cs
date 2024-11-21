@@ -2,18 +2,31 @@
 
 namespace PingTestTool
 {
-    public static class Defaults
+    public static class Constants
     {
         public const int MaxVisiblePoints = 100;
         public const int MinPingInterval = 100;
     }
 
-    public partial class GraphWindow : Window, INotifyPropertyChanged, IDisposable
+    public interface IGraphWindow
     {
+        bool IsLoaded { get; }
+        WindowState WindowState { get; set; }
+        bool IsVisible { get; }
+        Visibility Visibility { get; set; }
+        void SetPingData(List<int> roundtripTimes);
+        void Show();
+        void Close();
+        event EventHandler Closed;
+    }
+
+    public partial class GraphWindow : Window, INotifyPropertyChanged, IDisposable, IGraphWindow
+    {
+        private readonly ILoggingService _logger;
         private readonly GraphManager _graphManager;
         private readonly StatisticsManager _statisticsManager;
         private readonly DispatcherTimer _updateTimer;
-        private int _maxVisiblePoints = Defaults.MaxVisiblePoints;
+        private int _maxVisiblePoints = Constants.MaxVisiblePoints;
 
         public PlotModel PingPlotModel { get; }
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -23,44 +36,45 @@ namespace PingTestTool
             get => _maxVisiblePoints;
             set
             {
-                if (Interlocked.CompareExchange(ref _maxVisiblePoints, value, _maxVisiblePoints) != _maxVisiblePoints)
-                    return;
-
-                OnPropertyChanged();
-                _graphManager.UpdateMaxVisiblePoints(value);
-                _statisticsManager.UpdateMaxVisiblePoints(value);
-                _graphManager.UpdateGraph(value);
+                if (_maxVisiblePoints != value)
+                {
+                    _maxVisiblePoints = value;
+                    OnPropertyChanged(nameof(MaxVisiblePoints));
+                    _graphManager.UpdateMaxVisiblePoints(value);
+                    _statisticsManager.UpdateMaxVisiblePoints(value);
+                    _graphManager.UpdateGraph(value);
+                }
             }
         }
 
-        public GraphWindow(int pingInterval)
+        public GraphWindow(int pingInterval, ILoggingService logger)
         {
             InitializeComponent();
             DataContext = this;
-
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             PingPlotModel = new PlotModel
             {
                 Title = "График по времени отклика для Ping",
                 Background = OxyColors.White
             };
 
-            _graphManager = new GraphManager(PingPlotModel, UpdateTextFields);
+            _graphManager = new GraphManager(logger, PingPlotModel, UpdateTextFields);
             _statisticsManager = new StatisticsManager();
 
             _updateTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(Math.Max(pingInterval, Defaults.MinPingInterval))
+                Interval = TimeSpan.FromMilliseconds(Math.Max(pingInterval, Constants.MinPingInterval))
             };
 
             _updateTimer.Tick += (_, _) => Application.Current.Dispatcher.Invoke(() => _graphManager.UpdateGraph(_maxVisiblePoints));
             _updateTimer.Start();
         }
 
-        public void SetPingData(IEnumerable<int>? data)
+        public void SetPingData(List<int>? data)
         {
             if (data is null || !data.Any())
             {
-                Log.Warning("Пустые или нулевые данные получены для пинга.");
+                Log.Warning("[GraphWindow] Пустые или нулевые данные получены для пинга.");
                 return;
             }
 
@@ -71,10 +85,13 @@ namespace PingTestTool
 
         private void UpdateTextFields(string min, string avg, string max, string cur)
         {
-            txtMin.Text = min;
-            txtAvg.Text = avg;
-            txtMax.Text = max;
-            txtCur.Text = cur;
+            Dispatcher.Invoke(() =>
+            {
+                txtMin.Text = min;
+                txtAvg.Text = avg;
+                txtMax.Text = max;
+                txtCur.Text = cur;
+            });
         }
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -97,15 +114,17 @@ namespace PingTestTool
         private readonly ConcurrentDictionary<DateTime, double> _realtimeData = new();
         private readonly StatisticsManager _statisticsManager;
         private readonly LineSeries _normalSeries;
+        private readonly ILoggingService _logger;
         private readonly object _lock = new();
         private bool _disposed;
-        private int _maxVisiblePoints = Defaults.MaxVisiblePoints;
+        private int _maxVisiblePoints = Constants.MaxVisiblePoints;
 
-        public GraphManager(PlotModel plotModel, Action<string, string, string, string> updateTextFields)
+        public GraphManager(ILoggingService logger, PlotModel plotModel, Action<string, string, string, string> updateTextFields)
         {
             _plotModel = plotModel;
             _updateTextFields = updateTextFields;
             _statisticsManager = new StatisticsManager();
+            _logger = logger ?? new SerilogLoggingService();
 
             _normalSeries = new LineSeries
             {
@@ -161,7 +180,7 @@ namespace PingTestTool
         {
             if (_realtimeData.IsEmpty)
             {
-                Log.Warning("Нет данных для обновления графика.");
+                Log.Warning("No data to update graph.");
                 return;
             }
 
@@ -170,7 +189,9 @@ namespace PingTestTool
             _normalSeries.Points.Clear();
             _normalSeries.Points.AddRange(sortedData);
 
-            var stats = _statisticsManager.GetStatistics();
+            var dataValues = _realtimeData.Values.Select(d => (int)d).ToList();
+            var stats = _statisticsManager.GetStatistics(dataValues);
+            _logger.Information($"Min: {stats.Min}, Avg: {stats.Avg}, Max: {stats.Max}, Cur: {stats.Cur}");
             _updateTextFields(
                 $"{stats.Min:F1}",
                 $"{stats.Avg:F1}",
@@ -211,7 +232,7 @@ namespace PingTestTool
                 }
             }
 
-            Log.Information("Graph data updated. Current data count: {Count}", _realtimeData.Count);
+            Log.Information("[GraphWindow] Graph data updated. Current data count: {Count}", _realtimeData.Count);
         }
 
         public void Dispose()
@@ -231,7 +252,7 @@ namespace PingTestTool
     public class StatisticsManager : IDisposable
     {
         private ConcurrentQueue<int> _pingData = new();
-        private int _maxDataPoints = Defaults.MaxVisiblePoints;
+        private int _maxDataPoints = Constants.MaxVisiblePoints;
         private bool _disposed;
 
         public void UpdateMaxVisiblePoints(int maxVisiblePoints)
@@ -257,18 +278,16 @@ namespace PingTestTool
             }
         }
 
-        public PingStatistics GetStatistics()
+        public PingStatistics GetStatistics(List<int> data)
         {
-            if (!_pingData.Any())
+            if (data == null || data.Count == 0)
                 return new PingStatistics(0, 0, 0, 0);
 
-            var dataArray = _pingData.ToArray();
-
             return new PingStatistics(
-                dataArray.Min(),
-                dataArray.Average(),
-                dataArray.Max(),
-                dataArray.Last()
+                data.Min(),
+                data.Average(),
+                data.Max(),
+                data.Last()
             );
         }
 

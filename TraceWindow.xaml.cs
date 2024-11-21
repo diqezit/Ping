@@ -2,7 +2,17 @@
 
 namespace PingTestTool
 {
-    public partial class TraceWindow : Window
+    public interface ITraceWindow
+    {
+        bool IsLoaded { get; }
+        bool IsVisible { get; }
+        Visibility Visibility { get; set; }
+        void Show();
+        void Close();
+        event EventHandler Closed;
+    }
+
+    public partial class TraceWindow : Window, ITraceWindow
     {
         private readonly TraceManager _traceManager;
         public ICollectionView TraceResults { get; }
