@@ -2,7 +2,6 @@
 
 namespace PingTestTool
 {
-
     public interface IPingConfiguration
     {
         string Url { get; }
@@ -22,108 +21,26 @@ namespace PingTestTool
         string DetailedLog { get; }
     }
 
-    public class PingConfiguration : IPingConfiguration
+    public sealed class PingService : IPingTestService
     {
-        private const int MAX_TIMEOUT = 60000;
-
-        public string Url { get; }
-        public int PingCount { get; }
-        public int Timeout { get; }
-        public bool DontFragment { get; }
-
-        public PingConfiguration(string url, int pingCount, int timeout, bool dontFragment = true)
-        {
-            var logger = new SerilogLoggingService();
-            var urlErrors = ValidationHelper.ValidateUrl(url, logger);
-            var pingCountErrors = ValidationHelper.ValidatePingCount(pingCount.ToString(), logger);
-            var timeoutErrors = ValidationHelper.ValidateTimeout(timeout.ToString(), logger);
-
-            if (urlErrors.Any() || pingCountErrors.Any() || timeoutErrors.Any())
-            {
-                throw new ArgumentException("Invalid configuration.");
-            }
-
-            Url = url;
-            PingCount = pingCount;
-            Timeout = timeout;
-            DontFragment = dontFragment;
-        }
-
-        public void Validate()
-        {
-            // No additional validation needed as it's already done in the constructor.
-        }
-    }
-
-    public class PingTestResult : IPingTestResult
-    {
-        public int SuccessfulPings { get; }
-        public int FailedPings { get; }
-        public TimeSpan ExecutionTime { get; }
-        public double AverageJitter { get; }
-        public IReadOnlyList<int> RoundtripTimes { get; }
-        public string DetailedLog { get; }
-
-        public PingTestResult(
-            int successfulPings,
-            int failedPings,
-            TimeSpan executionTime,
-            double averageJitter,
-            IReadOnlyList<int> roundtripTimes,
-            string detailedLog)
-        {
-            SuccessfulPings = successfulPings;
-            FailedPings = failedPings;
-            ExecutionTime = executionTime;
-            AverageJitter = averageJitter;
-            RoundtripTimes = roundtripTimes;
-            DetailedLog = detailedLog;
-        }
-    }
-
-    public sealed class PingService : IAsyncDisposable, IPingTestService
-    {
-        #region Constants
-
         private const int BUFFER_SIZE = 32;
-        private const string LOG_SEPARATOR = "══════════════════════════════════════════════════════════";
-        private const string LOG_MINI_SEPARATOR = "──────────────────────────────────────";
         private const string TIME_FORMAT = "HH:mm:ss";
         private const string DATE_TIME_FORMAT = "dd.MM.yyyy HH:mm:ss";
-
-        #endregion
-
-        #region Fields
+        private const string LOG_SEPARATOR = "══════════════════════════════════════════════════════════";
+        private const string LOG_MINI_SEPARATOR = "──────────────────────────────────────";
 
         private readonly List<int> _roundtripTimes = new();
         private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly ILoggingService _logger;
         private bool _isDisposed;
 
-        #endregion
-
-        #region Events
-
         public event Action<string>? OnPingResult;
         public event Action<int, int>? OnProgressUpdate;
         public event Action<int>? OnRoundtripTimeAdded;
 
-        #endregion
-
-        #region Constructor
-
         public PingService(ILoggingService? logger = null)
         {
             _logger = logger ?? new SerilogLoggingService();
-        }
-
-        #endregion
-
-        #region Public Methods
-
-        public async Task StartPingTestAsync(PingConfiguration config, CancellationToken cancellationToken = default)
-        {
-            await StartPingTestAsync((IPingConfiguration)config, cancellationToken);
         }
 
         public async Task<IPingTestResult> StartPingTestAsync(
@@ -140,27 +57,25 @@ namespace PingTestTool
 
             try
             {
-                var (successfulPings, failedPings) = await ExecutePingTestsAsync(
-                    config, responseTimes, cancellationToken);
-
+                var testResults = await ExecutePingTestsAsync(config, responseTimes, cancellationToken);
                 var endTime = DateTime.Now;
                 var executionTime = endTime - startTime;
                 var avgJitter = await CalculateAverageJitterAsync(cancellationToken);
 
-                var finalLog = GenerateFinalReport(
+                var finalLog = await GenerateFinalReport(
                     logBuilder,
                     responseTimes,
                     startTime,
                     endTime,
                     executionTime,
                     avgJitter,
-                    successfulPings,
-                    failedPings,
+                    testResults.SuccessfulPings,
+                    testResults.FailedPings,
                     config.PingCount);
 
                 return new PingTestResult(
-                    successfulPings,
-                    failedPings,
+                    testResults.SuccessfulPings,
+                    testResults.FailedPings,
                     executionTime,
                     avgJitter,
                     await GetRoundtripTimesAsync(cancellationToken),
@@ -179,12 +94,18 @@ namespace PingTestTool
             }
         }
 
-        public Task ClearRoundtripTimesAsync() => ClearRoundtripTimesAsync(CancellationToken.None);
-
-        public async Task<List<int>?> GetRoundtripTimesAsync()
+        public async Task ClearRoundtripTimesAsync(CancellationToken cancellationToken = default)
         {
-            var times = await GetRoundtripTimesAsync(CancellationToken.None);
-            return times.ToList();
+            await ThrowIfDisposedAsync(cancellationToken);
+            await _lock.WaitAsync(cancellationToken);
+            try
+            {
+                _roundtripTimes.Clear();
+            }
+            finally
+            {
+                _lock.Release();
+            }
         }
 
         public async Task<IReadOnlyList<int>> GetRoundtripTimesAsync(CancellationToken cancellationToken = default)
@@ -201,23 +122,18 @@ namespace PingTestTool
             }
         }
 
-        public async Task ClearRoundtripTimesAsync(CancellationToken cancellationToken = default)
+        public async ValueTask DisposeAsync()
         {
-            await ThrowIfDisposedAsync(cancellationToken);
-            await _lock.WaitAsync(cancellationToken);
-            try
+            if (!_isDisposed)
             {
-                _roundtripTimes.Clear();
-            }
-            finally
-            {
-                _lock.Release();
+                await ClearRoundtripTimesAsync();
+                _lock.Dispose();
+                _isDisposed = true;
+
+                GC.SuppressFinalize(this);
+                _logger.Information("[PingService] Сервис пинга успешно освобожден.");
             }
         }
-
-        #endregion
-
-        #region Private Methods
 
         private void InitializeLogBuilder(
             StringBuilder logBuilder,
@@ -247,9 +163,7 @@ namespace PingTestTool
             StringBuilder responseTimes,
             CancellationToken cancellationToken)
         {
-            var successfulPings = 0;
-            var failedPings = 0;
-
+            var (successfulPings, failedPings) = (0, 0);
             using var ping = new Ping();
             var options = new PingOptions { DontFragment = config.DontFragment };
             var buffer = new byte[BUFFER_SIZE];
@@ -258,14 +172,14 @@ namespace PingTestTool
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var (isSuccess, roundtripTime, message, elapsedMs) = await PerformSinglePingAsync(
-                    ping, config.Url, config.Timeout, options, buffer, i + 1, config.PingCount, cancellationToken);
+                var result = await ExecuteSinglePingAsync(
+                    ping, config, options, buffer, i + 1, cancellationToken);
 
-                responseTimes.AppendLine(message);
+                responseTimes.AppendLine(result.Message);
 
-                if (isSuccess)
+                if (result.IsSuccess)
                 {
-                    await AddRoundtripTimeAsync(roundtripTime, cancellationToken);
+                    await AddRoundtripTimeAsync(result.RoundtripTime, cancellationToken);
                     successfulPings++;
                 }
                 else
@@ -275,58 +189,57 @@ namespace PingTestTool
 
                 OnProgressUpdate?.Invoke(i + 1, config.PingCount);
 
-                var delay = CalculateDelay(config.Timeout, elapsedMs);
+                var delay = CalculateDelay(config.Timeout, result.ElapsedMilliseconds);
                 if (delay > 0)
                 {
                     await Task.Delay(delay, cancellationToken);
                 }
             }
 
-            _logger.Information("[PingService] Выполнение пинг-тестов завершено. Успешных: {SuccessfulPings}, Неудачных: {FailedPings}",
+            _logger.Information(
+                "[PingService] Выполнение пинг-тестов завершено. Успешных: {SuccessfulPings}, Неудачных: {FailedPings}",
                 successfulPings, failedPings);
+
             return (successfulPings, failedPings);
         }
 
-        private async Task<(bool IsSuccess, int RoundtripTime, string Message, long ElapsedMilliseconds)>
-            PerformSinglePingAsync(
-                Ping ping,
-                string url,
-                int timeout,
-                PingOptions options,
-                byte[] buffer,
-                int currentPing,
-                int totalPings,
-                CancellationToken cancellationToken)
+        private async Task<PingExecutionResult> ExecuteSinglePingAsync(
+            Ping ping,
+            IPingConfiguration config,
+            PingOptions options,
+            byte[] buffer,
+            int currentPing,
+            CancellationToken cancellationToken)
         {
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                var reply = await ping.SendPingAsync(url, timeout, buffer, options);
+                var reply = await ping.SendPingAsync(config.Url, config.Timeout, buffer, options);
                 stopwatch.Stop();
 
-                var resultLine = FormatPingResult(reply, url, currentPing, totalPings);
+                var resultLine = FormatPingResult(reply, config.Url, currentPing, config.PingCount);
                 OnPingResult?.Invoke(resultLine + Environment.NewLine);
 
                 _logger.Information(
                     "[PingService] Пинг {CurrentPing}/{TotalPings} к {Url} завершен. Статус: {Status}, Время: {RoundtripTime} мс",
-                    currentPing, totalPings, url, reply.Status, reply.RoundtripTime);
+                    currentPing, config.PingCount, config.Url, reply.Status, reply.RoundtripTime);
 
-                return (reply.Status == IPStatus.Success,
-                       (int)reply.RoundtripTime,
-                       resultLine,
-                       stopwatch.ElapsedMilliseconds);
+                return new PingExecutionResult(
+                    reply.Status == IPStatus.Success,
+                    (int)reply.RoundtripTime,
+                    resultLine,
+                    stopwatch.ElapsedMilliseconds);
             }
             catch (PingException ex)
             {
                 stopwatch.Stop();
-
                 _logger.Error(ex,
                     "[PingService] Ошибка пинга {CurrentPing}/{TotalPings} к {Url}",
-                    currentPing, totalPings, url);
+                    currentPing, config.PingCount, config.Url);
 
-                var errorMessage = FormatPingError(url, currentPing, totalPings, ex.Message);
+                var errorMessage = FormatPingError(config.Url, currentPing, config.PingCount, ex.Message);
                 OnPingResult?.Invoke(errorMessage + Environment.NewLine);
-                throw;
+                return new PingExecutionResult(false, 0, errorMessage, stopwatch.ElapsedMilliseconds);
             }
         }
 
@@ -379,13 +292,13 @@ namespace PingTestTool
             {
                 if (_roundtripTimes.Count <= 1) return 0;
 
-                var totalJitter = 0.0;
+                var jitters = new List<double>(_roundtripTimes.Count - 1);
                 for (var i = 1; i < _roundtripTimes.Count; i++)
                 {
-                    totalJitter += Math.Abs(_roundtripTimes[i] - _roundtripTimes[i - 1]);
+                    jitters.Add(Math.Abs(_roundtripTimes[i] - _roundtripTimes[i - 1]));
                 }
 
-                var avgJitter = Math.Round(totalJitter / (_roundtripTimes.Count - 1), 2);
+                var avgJitter = Math.Round(jitters.Average(), 2);
                 _logger.Information("[PingService] Рассчитан средний джиттер: {AvgJitter} мс", avgJitter);
                 return avgJitter;
             }
@@ -395,18 +308,43 @@ namespace PingTestTool
             }
         }
 
-        private string GenerateFinalReport(
-                    StringBuilder logBuilder,
-                    StringBuilder responseTimes,
-                    DateTime startTime,
-                    DateTime endTime,
-                    TimeSpan executionTime,
-                    double avgJitter,
-                    int successfulPings,
-                    int failedPings,
-                    int totalPings)
+        private async Task<(int Min, int Max, double Average)> CalculateStatisticsAsync(
+            CancellationToken cancellationToken)
         {
-            var stats = CalculateStatistics();
+            await _lock.WaitAsync(cancellationToken);
+            try
+            {
+                if (_roundtripTimes.Count == 0)
+                    return (0, 0, 0);
+
+                var min = _roundtripTimes.Min();
+                var max = _roundtripTimes.Max();
+                var avg = _roundtripTimes.Average();
+
+                _logger.Information(
+                    "[PingService] Рассчитана статистика времени: Минимальное: {Min} мс, Максимальное: {Max} мс, Среднее: {Avg:F2} мс",
+                    min, max, avg);
+
+                return (min, max, avg);
+            }
+            finally
+            {
+                _lock.Release();
+            }
+        }
+
+        private async Task<string> GenerateFinalReport(
+            StringBuilder logBuilder,
+            StringBuilder responseTimes,
+            DateTime startTime,
+            DateTime endTime,
+            TimeSpan executionTime,
+            double avgJitter,
+            int successfulPings,
+            int failedPings,
+            int totalPings)
+        {
+            var stats = await CalculateStatisticsAsync(CancellationToken.None);
             var lossPercentage = totalPings > 0
                 ? (failedPings * 100.0 / totalPings).ToString("F2")
                 : "0.00";
@@ -427,9 +365,9 @@ namespace PingTestTool
 
                 {LOG_MINI_SEPARATOR}
                 Статистика времени:
-                    Минимальное:     {stats.min} мс
-                    Максимальное:    {stats.max} мс
-                    Среднее:         {stats.avg:F2} мс
+                    Минимальное:     {stats.Min} мс
+                    Максимальное:    {stats.Max} мс
+                    Среднее:         {stats.Average:F2} мс
                     Джиттер:         {avgJitter:F2} мс
                 {LOG_SEPARATOR}
                 """;
@@ -451,27 +389,6 @@ namespace PingTestTool
             return $"{time.TotalSeconds:F2} секунд";
         }
 
-        private (int min, int max, double avg) CalculateStatistics()
-        {
-            if (_roundtripTimes.Count == 0)
-                return (0, 0, 0);
-
-            var min = int.MaxValue;
-            var max = int.MinValue;
-            var sum = 0.0;
-
-            foreach (var time in _roundtripTimes)
-            {
-                min = Math.Min(min, time);
-                max = Math.Max(max, time);
-                sum += time;
-            }
-
-            var avg = sum / _roundtripTimes.Count;
-            _logger.Information("[PingService] Рассчитана статистика времени: Минимальное: {Min} мс, Максимальное: {Max} мс, Среднее: {Avg:F2} мс", min, max, avg);
-            return (min, max, avg);
-        }
-
         private async Task ThrowIfDisposedAsync(CancellationToken cancellationToken)
         {
             await _lock.WaitAsync(cancellationToken);
@@ -487,19 +404,78 @@ namespace PingTestTool
                 _lock.Release();
             }
         }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (!_isDisposed)
-            {
-                await ClearRoundtripTimesAsync();
-                _lock.Dispose();
-                _isDisposed = true;
-
-                GC.SuppressFinalize(this);
-                _logger.Information("[PingService] Сервис пинга успешно освобожден.");
-            }
-        }
-        #endregion
     }
+
+    public class PingConfiguration : IPingConfiguration
+    {
+        public string Url { get; }
+        public int PingCount { get; }
+        public int Timeout { get; }
+        public bool DontFragment { get; }
+
+        public PingConfiguration(string url, int pingCount, int timeout, bool dontFragment = true)
+        {
+            var logger = new SerilogLoggingService();
+            var errors = ValidateParameters(url, pingCount, timeout, logger);
+
+            if (errors.Any())
+            {
+                throw new ArgumentException("Invalid configuration parameters.");
+            }
+
+            Url = url;
+            PingCount = pingCount;
+            Timeout = timeout;
+            DontFragment = dontFragment;
+        }
+
+        public void Validate() { } // Validation is performed in constructor
+
+        private static IEnumerable<string> ValidateParameters(
+            string url,
+            int pingCount,
+            int timeout,
+            ILoggingService logger)
+        {
+            var errors = new List<string>();
+
+            errors.AddRange(ValidationHelper.ValidateUrl(url, logger));
+            errors.AddRange(ValidationHelper.ValidatePingCount(pingCount.ToString(), logger));
+            errors.AddRange(ValidationHelper.ValidateTimeout(timeout.ToString(), logger));
+
+            return errors;
+        }
+    }
+
+    public class PingTestResult : IPingTestResult
+    {
+        public int SuccessfulPings { get; }
+        public int FailedPings { get; }
+        public TimeSpan ExecutionTime { get; }
+        public double AverageJitter { get; }
+        public IReadOnlyList<int> RoundtripTimes { get; }
+        public string DetailedLog { get; }
+
+        public PingTestResult(
+            int successfulPings,
+            int failedPings,
+            TimeSpan executionTime,
+            double averageJitter,
+            IReadOnlyList<int> roundtripTimes,
+            string detailedLog)
+        {
+            SuccessfulPings = successfulPings;
+            FailedPings = failedPings;
+            ExecutionTime = executionTime;
+            AverageJitter = averageJitter;
+            RoundtripTimes = roundtripTimes;
+            DetailedLog = detailedLog;
+        }
+    }
+
+    internal readonly record struct PingExecutionResult(
+        bool IsSuccess,
+        int RoundtripTime,
+        string Message,
+        long ElapsedMilliseconds);
 }

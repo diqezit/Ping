@@ -215,10 +215,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="MainWindow\MainWindowEventHandler.cs" />
     <Compile Include="Service\CompileService.cs" />
     <Compile Include="Service\GlobalUsings.cs" />
-    <Compile Include="Service\LoggingService.cs" />
     <Compile Include="Service\RelayCommand.cs" />
     <Compile Include="Traceroute\DNSManager.cs" />
     <Compile Include="Traceroute\HopTraceManager.cs" />
