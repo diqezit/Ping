@@ -33,17 +33,6 @@ namespace PingTestTool
         void ShowWarnings(ValidationResult result);
     }
 
-    public interface IPingTestService : IAsyncDisposable
-    {
-        event Action<string>? OnPingResult;
-        event Action<int, int>? OnProgressUpdate;
-        event Action<int>? OnRoundtripTimeAdded;
-
-        Task<IPingTestResult> StartPingTestAsync(IPingConfiguration config, CancellationToken cancellationToken = default);
-        Task ClearRoundtripTimesAsync(CancellationToken cancellationToken = default);
-        Task<IReadOnlyList<int>> GetRoundtripTimesAsync(CancellationToken cancellationToken = default);
-    }
-
     // -------------------- Models --------------------
 
     public sealed class ValidationResult

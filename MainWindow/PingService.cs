@@ -21,6 +21,17 @@ namespace PingTestTool
         string DetailedLog { get; }
     }
 
+    public interface IPingTestService : IAsyncDisposable
+    {
+        event Action<string>? OnPingResult;
+        event Action<int, int>? OnProgressUpdate;
+        event Action<int>? OnRoundtripTimeAdded;
+
+        Task<IPingTestResult> StartPingTestAsync(IPingConfiguration config, CancellationToken cancellationToken = default);
+        Task ClearRoundtripTimesAsync(CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<int>> GetRoundtripTimesAsync(CancellationToken cancellationToken = default);
+    }
+
     public sealed class PingService : IPingTestService
     {
         private const int BUFFER_SIZE = 32;
@@ -114,7 +125,7 @@ namespace PingTestTool
             await _lock.WaitAsync(cancellationToken);
             try
             {
-                return _roundtripTimes.ToList();
+                return _roundtripTimes.ToList().AsReadOnly();
             }
             finally
             {
@@ -144,7 +155,7 @@ namespace PingTestTool
                 {LOG_SEPARATOR}
                   ТЕСТ PING
                 {LOG_SEPARATOR}
-                Время начала:    {startTime.ToString(DATE_TIME_FORMAT)}
+                Время начала:    {startTime:dd.MM.yyyy HH:mm:ss}
                 Хост:           {config.Url}
                 Кол-во пингов:  {config.PingCount}
                 Таймаут:        {config.Timeout} мс
@@ -248,7 +259,7 @@ namespace PingTestTool
             if (reply.Status == IPStatus.Success)
             {
                 return $"""
-                    [{DateTime.Now.ToString(TIME_FORMAT)}] [{currentPing}/{totalPings}] Ответ от {url}:
+                    [{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] Ответ от {url}:
                         Время: {reply.RoundtripTime,4} мс
                         TTL:   {reply.Options?.Ttl ?? 0}
                         Размер:{reply.Buffer?.Length ?? 0} байт
@@ -256,14 +267,14 @@ namespace PingTestTool
             }
 
             return $"""
-                [{DateTime.Now.ToString(TIME_FORMAT)}] [{currentPing}/{totalPings}] Ошибка пинга {url}:
+                [{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] Ошибка пинга {url}:
                     Статус: {reply.Status}
                 """;
         }
 
         private static string FormatPingError(string url, int currentPing, int totalPings, string error) =>
             $"""
-            [{DateTime.Now.ToString(TIME_FORMAT)}] [{currentPing}/{totalPings}] Критическая ошибка пинга {url}:
+            [{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] Критическая ошибка пинга {url}:
                 {error}
             """;
 
@@ -353,8 +364,8 @@ namespace PingTestTool
                 {LOG_SEPARATOR}
                   ИТОГИ ТЕСТИРОВАНИЯ
                 {LOG_SEPARATOR}
-                Время начала:   {startTime.ToString(DATE_TIME_FORMAT)}
-                Время конца:    {endTime.ToString(DATE_TIME_FORMAT)}
+                Время начала:   {startTime:dd.MM.yyyy HH:mm:ss}
+                Время конца:    {endTime:dd.MM.yyyy HH:mm:ss}
                 Длительность:   {FormatExecutionTime(executionTime)}
 
                 {LOG_MINI_SEPARATOR}
@@ -373,7 +384,7 @@ namespace PingTestTool
                 """;
 
             logBuilder.AppendLine(responseTimes.ToString())
-                     .AppendLine(summary);
+                .AppendLine(summary);
 
             OnPingResult?.Invoke(summary);
             _logger.Information("[PingService] Сгенерирован итоговый отчет.");
@@ -413,14 +424,20 @@ namespace PingTestTool
         public int Timeout { get; }
         public bool DontFragment { get; }
 
-        public PingConfiguration(string url, int pingCount, int timeout, bool dontFragment = true)
+        public PingConfiguration(
+            string url,
+            int pingCount,
+            int timeout,
+            bool dontFragment = true)
         {
             var logger = new SerilogLoggingService();
             var errors = ValidateParameters(url, pingCount, timeout, logger);
 
             if (errors.Any())
             {
-                throw new ArgumentException("Invalid configuration parameters.");
+                throw new ArgumentException(
+                    "Invalid configuration parameters: " +
+                    string.Join(", ", errors));
             }
 
             Url = url;
