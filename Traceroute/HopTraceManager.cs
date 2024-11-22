@@ -1,8 +1,0 @@
-﻿#nullable enable
-
-namespace PingTestTool
-{
-
-
-
-}

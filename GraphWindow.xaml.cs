@@ -2,12 +2,14 @@
 
 namespace PingTestTool
 {
-    public static class Constants
+    // -------------------- Constants --------------------
+    public static class Constant
     {
         public const int MaxVisiblePoints = 100;
         public const int MinPingInterval = 100;
     }
 
+    // -------------------- Interfaces --------------------
     public interface IGraphWindow
     {
         bool IsLoaded { get; }
@@ -34,13 +36,21 @@ namespace PingTestTool
         PingStatistics GetStatistics(List<int> data);
     }
 
+    // -------------------- Data Structures --------------------
+    public readonly record struct PingStatistics(
+        double Min,
+        double Avg,
+        double Max,
+        double Cur);
+
+    // -------------------- Implementations --------------------
     public partial class GraphWindow : Window, INotifyPropertyChanged, IDisposable, IGraphWindow
     {
         private readonly ILoggingService _logger;
         private readonly IGraphManager _graphManager;
         private readonly IStatisticsManager _statisticsManager;
         private readonly DispatcherTimer _updateTimer;
-        private int _maxVisiblePoints = Constants.MaxVisiblePoints;
+        private int _maxVisiblePoints = Constant.MaxVisiblePoints;
 
         public PlotModel PingPlotModel { get; }
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -81,7 +91,7 @@ namespace PingTestTool
 
             _updateTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(Math.Max(pingInterval, Constants.MinPingInterval))
+                Interval = TimeSpan.FromMilliseconds(Math.Max(pingInterval, Constant.MinPingInterval))
             };
 
             _updateTimer.Tick += (_, _) => Application.Current.Dispatcher.Invoke(() =>
@@ -136,15 +146,15 @@ namespace PingTestTool
         private readonly ILoggingService _logger;
         private readonly object _lock = new();
         private bool _disposed;
-        private int _maxVisiblePoints = Constants.MaxVisiblePoints;
+        private int _maxVisiblePoints = Constant.MaxVisiblePoints;
 
         public GraphManager(ILoggingService logger, PlotModel plotModel, Action<string, string, string, string> updateTextFields, IStatisticsManager statisticsManager)
         {
             _plotModel = plotModel;
             _updateTextFields = updateTextFields;
-            _statisticsManager = statisticsManager ?? 
+            _statisticsManager = statisticsManager ??
                 throw new ArgumentNullException(nameof(statisticsManager));
-            _logger = logger ?? 
+            _logger = logger ??
                 throw new ArgumentNullException(nameof(logger));
 
             _normalSeries = new LineSeries
@@ -273,7 +283,7 @@ namespace PingTestTool
     public class StatisticsManager : IStatisticsManager
     {
         private ConcurrentQueue<int> _pingData = new();
-        private int _maxDataPoints = Constants.MaxVisiblePoints;
+        private int _maxDataPoints = Constant.MaxVisiblePoints;
         private bool _disposed;
 
         public void UpdateMaxVisiblePoints(int maxVisiblePoints)
@@ -320,6 +330,4 @@ namespace PingTestTool
             _disposed = true;
         }
     }
-
-    public readonly record struct PingStatistics(double Min, double Avg, double Max, double Cur);
 }

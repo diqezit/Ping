@@ -464,7 +464,7 @@ namespace PingTestTool
         {
             if (_traceWindow == null || !_traceWindow.IsLoaded)
             {
-                _traceWindow = new TraceWindow(_mainWindow.txtURL.Text);
+                _traceWindow = new TraceWindow(_mainWindow.txtURL.Text, _logger);
                 _traceWindow.Closed += HandleWindowClosed;
                 _traceWindow.Show();
                 _logger.Information("[MainWindow] Создано новое окно трассировки.");
@@ -538,7 +538,10 @@ namespace PingTestTool
 
         private async void BtnPing_Click(object sender, RoutedEventArgs e)
         {
-            await _eventHandler?.HandlePingButtonClickAsync();
+            if (_eventHandler != null)
+            {
+                await _eventHandler.HandlePingButtonClickAsync();
+            }
         }
 
         private void BtnStop_Click(object sender, RoutedEventArgs e)
@@ -548,7 +551,10 @@ namespace PingTestTool
 
         private async void BtnShowGraph_Click(object sender, RoutedEventArgs e)
         {
-            await _eventHandler?.HandleShowGraphButtonClickAsync();
+            if (_eventHandler != null)
+            {
+                await _eventHandler.HandleShowGraphButtonClickAsync();
+            }
         }
 
         private void BtnTraceRoute_Click(object sender, RoutedEventArgs e)

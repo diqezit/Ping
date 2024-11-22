@@ -2,158 +2,117 @@
 
 namespace PingTestTool
 {
-
-    public class DnsManager : IDnsManager
+    // -------------------- Constants --------------------
+    public static class Constants
     {
-        private const string DefaultUnresolvedValue = "---";
-        private readonly IMemoryCache _dnsCache;
-        private readonly TimeSpan _dnsTimeout;
-        private readonly MemoryCacheEntryOptions _cacheOptions;
+        public const string DefaultUnresolvedValue = "---";
+        public const string MsUnitSuffix = " ms";
+        public const string PercentageSuffix = "%";
+        public const string DefaultFormat = "F0";
 
-        public DnsManager(IMemoryCache memoryCache, TimeSpan? dnsTimeout = null)
+        public static class Ping
         {
-            _dnsCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
-            _dnsTimeout = dnsTimeout ?? TimeSpan.FromSeconds(5);
-            _cacheOptions = new MemoryCacheEntryOptions()
-                .SetAbsoluteExpiration(TimeSpan.FromMinutes(30))
-                .SetSlidingExpiration(TimeSpan.FromMinutes(10));
-
-            Log.Information("[DnsManager] DnsManager инициализирован");
+            public const int BufferSize = 32;
+            public const int MaxTtl = 12;
+            public const int Timeout = 5000;
+            public const int ParallelRequests = 1;
+            public const int BaseDelay = 1000;
+            public const int MinDelay = 100;
+            public const double HighLossThreshold = 50;
+            public const double LowLossThreshold = 10;
         }
 
-        public async Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token)
+        public static class Network
         {
-            if (!IPAddress.TryParse(ipAddress, out var parsedIp))
-            {
-                Log.Error("[DnsManager] Некорректный IP-адрес: {IpAddress}", ipAddress);
-                throw new ArgumentException("Некорректный IP-адрес", nameof(ipAddress));
-            }
-
-            if (_dnsCache.TryGetValue(ipAddress, out string? cachedResult))
-            {
-                return cachedResult;
-            }
-
-            try
-            {
-                if (parsedIp.IsPrivate())
-                {
-                    var localName = GetLocalNetworkName(parsedIp);
-                    _dnsCache.Set(ipAddress, localName, _cacheOptions);
-                    return localName;
-                }
-
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                cts.CancelAfter(_dnsTimeout);
-
-                var hostEntry = await Dns.GetHostEntryAsync(parsedIp);
-                var domainName = hostEntry.HostName;
-                _dnsCache.Set(ipAddress, domainName, _cacheOptions);
-
-                return domainName;
-            }
-            catch (Exception ex)
-            {
-                _dnsCache.Set(ipAddress, DefaultUnresolvedValue, _cacheOptions);
-                Log.Warning("[DnsManager] Возвращен неразрешенный результат для IP: {IpAddress}", ipAddress, ex);
-                return DefaultUnresolvedValue;
-            }
+            public const byte PrivateNetworkAFirstByte = 10;
+            public const byte PrivateNetworkBFirstByte = 172;
+            public const byte PrivateNetworkBSecondByteStart = 16;
+            public const byte PrivateNetworkBSecondByteEnd = 31;
+            public const byte PrivateNetworkCFirstByte = 192;
+            public const byte PrivateNetworkCSecondByte = 168;
         }
-
-        private string GetLocalNetworkName(IPAddress ip) => ip.AddressFamily switch
-        {
-            AddressFamily.InterNetworkV6 => GetLocalIpv6Name(ip),
-            AddressFamily.InterNetwork => GetLocalIpv4Name(ip),
-            _ => "Неизвестный локальный адрес"
-        };
-
-        private string GetLocalIpv6Name(IPAddress ip) => ip switch
-        {
-            { IsIPv6LinkLocal: true } => "IPv6 Link-Local",
-            { IsIPv6SiteLocal: true } => "IPv6 Site-Local",
-            { IsIPv6Multicast: true } => "IPv6 Multicast",
-            _ => "Прочий IPv6 адрес"
-        };
-
-        private string GetLocalIpv4Name(IPAddress ip) => ip switch
-        {
-            var addr when addr.IsInSubnet(IPAddress.Parse("192.168.0.0"), 16) => "Локальная сеть (Router)",
-            var addr when addr.IsInSubnet(IPAddress.Parse("10.0.0.0"), 8) => "DNS провайдера",
-            var addr when addr.IsInSubnet(IPAddress.Parse("172.16.0.0"), 12) => "Локальная сеть",
-            _ => "Прочий IPv4 адрес"
-        };
     }
 
+    // -------------------- Interfaces --------------------
     public interface IDnsManager
     {
         Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token);
     }
 
-    public static class DnsManagerExtensions
+    public interface IPingManager
     {
-        private const byte PrivateNetworkAFirstByte = 10;
-        private const byte PrivateNetworkBFirstByte = 172;
-        private const byte PrivateNetworkBSecondByteStart = 16;
-        private const byte PrivateNetworkBSecondByteEnd = 31;
-        private const byte PrivateNetworkCFirstByte = 192;
-        private const byte PrivateNetworkCSecondByte = 168;
-
-        public static bool IsPrivate(this IPAddress ipAddress)
-        {
-            if (ipAddress == null) return false;
-
-            var bytes = ipAddress.GetAddressBytes();
-            return ipAddress.AddressFamily switch
-            {
-                AddressFamily.InterNetwork => IsPrivateIPv4(bytes),
-                AddressFamily.InterNetworkV6 => IsPrivateIPv6(bytes),
-                _ => false
-            };
-        }
-
-        public static bool IsInSubnet(this IPAddress ipAddress, IPAddress subnetMask, int prefixLength)
-        {
-            if (ipAddress == null || subnetMask == null || ipAddress.AddressFamily != subnetMask.AddressFamily)
-                return false;
-
-            var ipBytes = ipAddress.GetAddressBytes();
-            var subnetBytes = subnetMask.GetAddressBytes();
-
-            int fullBytes = prefixLength / 8;
-            int remainingBits = prefixLength % 8;
-
-            for (int i = 0; i < fullBytes; i++)
-            {
-                if (ipBytes[i] != subnetBytes[i])
-                    return false;
-            }
-
-            if (remainingBits > 0)
-            {
-                int mask = 0xFF << (8 - remainingBits);
-                return (ipBytes[fullBytes] & mask) == (subnetBytes[fullBytes] & mask);
-            }
-
-            return true;
-        }
-
-        private static bool IsPrivateIPv4(byte[] bytes) =>
-            bytes[0] == PrivateNetworkAFirstByte ||
-            (bytes[0] == PrivateNetworkBFirstByte && bytes[1] >= PrivateNetworkBSecondByteStart && bytes[1] <= PrivateNetworkBSecondByteEnd) ||
-            (bytes[0] == PrivateNetworkCFirstByte && bytes[1] == PrivateNetworkCSecondByte);
-
-        private static bool IsPrivateIPv6(byte[] bytes) => bytes[0] == 0xfc || bytes[0] == 0xfd;
+        Task StartTraceAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback);
+        void ClearHopData();
     }
 
-    public class TraceResult : INotifyPropertyChanged
+    public interface ITraceWindow
     {
-        private const string MsUnitSuffix = " ms";
-        private const string PercentageSuffix = "%";
-        private const string DefaultFormat = "F0";
+        bool IsLoaded { get; }
+        bool IsVisible { get; }
+        Visibility Visibility { get; set; }
+        void Show();
+        void Close();
+        event EventHandler Closed;
+    }
 
+    // -------------------- Models --------------------
+    public abstract class ObservableBase : INotifyPropertyChanged
+    {
         private readonly Dictionary<string, object> _propertyValues = new();
-
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        protected bool SetProperty<T>(T value, [CallerMemberName] string? propertyName = null)
+        {
+            if (propertyName == null) return false;
+
+            if (!_propertyValues.TryGetValue(propertyName, out var currentValue) ||
+                !ReferenceEquals(currentValue, value) &&
+                !EqualityComparer<T>.Default.Equals((T)currentValue, value))
+            {
+                _propertyValues[propertyName] = value!;
+                OnPropertyChanged(propertyName);
+                return true;
+            }
+            return false;
+        }
+
+        protected T GetProperty<T>(T defaultValue = default!, [CallerMemberName] string? propertyName = null)
+        {
+            if (propertyName == null) return defaultValue;
+            return _propertyValues.TryGetValue(propertyName, out var value)
+                ? (T)value
+                : defaultValue;
+        }
+    }
+
+    public abstract class ValidationBase
+    {
+        protected static void ValidateNotNull<T>(T value, string paramName, ILoggingService logger) where T : class
+        {
+            if (value == null)
+            {
+                logger.Error($"[{typeof(T).Name}] {paramName} не может быть null.");
+                throw new ArgumentNullException(paramName);
+            }
+        }
+
+        protected static void ValidateNotNullOrEmpty(string value, string paramName, ILoggingService logger)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                logger.Error($"[{typeof(ValidationBase).Name}] {paramName} не может быть пустым.");
+                throw new ArgumentException($"{paramName} не может быть пустым.", paramName);
+            }
+        }
+    }
+
+    public class TraceResult : ObservableBase
+    {
+
+        private readonly ILoggingService _logger;
 
         public int Nr
         {
@@ -215,11 +174,13 @@ namespace PingTestTool
             set => SetProperty(value ?? string.Empty);
         }
 
-        public TraceResult(int ttl, string ipAddress, string domainName, HopData hop)
+        public TraceResult(ILoggingService logger, int ttl, string ipAddress, string domainName, HopData hop)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
             if (hop == null)
             {
-                Log.Error("[TraceResult] HopData не может быть null.");
+                _logger.Error("[TraceResult] HopData не может быть null.");
                 throw new ArgumentNullException(nameof(hop));
             }
 
@@ -233,10 +194,11 @@ namespace PingTestTool
         {
             if (hop == null)
             {
-                Log.Error("[TraceResult] HopData не может быть null.");
+                _logger.Error("[TraceResult] HopData не может быть null.");
                 throw new ArgumentNullException(nameof(hop));
             }
 
+            _logger.Information($"[TraceResult] Обновление статистики для {DomainName}.");
             var stats = hop.GetStatistics();
             UpdateStatisticsValues(
                 hop.Sent,
@@ -253,9 +215,10 @@ namespace PingTestTool
             int sent, int received, double lossPercentage,
             long bestTime, long worstTime, double averageTime, long lastTime)
         {
+            _logger.Information($"[TraceResult] Обновление значений статистики: Sent={sent}, Received={received}.");
             SetProperty(sent.ToString(), nameof(Sent));
             SetProperty(received.ToString(), nameof(Received));
-            SetProperty($"{lossPercentage.ToString(DefaultFormat)}{PercentageSuffix}", nameof(Loss));
+            SetProperty($"{lossPercentage.ToString(Constants.DefaultFormat)}{Constants.PercentageSuffix}", nameof(Loss));
             SetProperty(FormatMilliseconds(bestTime), nameof(Best));
             SetProperty(FormatMilliseconds(worstTime), nameof(Wrst));
             SetProperty(FormatMilliseconds((long)averageTime), nameof(Avrg));
@@ -263,38 +226,15 @@ namespace PingTestTool
         }
 
         private static string FormatMilliseconds(long milliseconds) =>
-            $"{milliseconds}{MsUnitSuffix}";
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-
-        private bool SetProperty<T>(T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (propertyName == null) return false;
-
-            if (!_propertyValues.TryGetValue(propertyName, out var currentValue) ||
-                !EqualityComparer<T>.Default.Equals((T)currentValue, value))
-            {
-                _propertyValues[propertyName] = value;
-                OnPropertyChanged(propertyName);
-                return true;
-            }
-            return false;
-        }
-
-        private T GetProperty<T>(T defaultValue = default!, [CallerMemberName] string? propertyName = null)
-        {
-            if (propertyName == null) return defaultValue;
-            return _propertyValues.TryGetValue(propertyName, out var value)
-                ? (T)value
-                : defaultValue;
-        }
+            $"{milliseconds}{Constants.MsUnitSuffix}";
     }
 
     public class HopData
     {
         private readonly ConcurrentBag<long> _responseTimes = new();
         private readonly object _statsLock = new();
+        private readonly ILoggingService _logger;
+        private readonly object _lock = new();
 
         private volatile int _sent;
         private volatile int _received;
@@ -302,6 +242,10 @@ namespace PingTestTool
         private long? _lastResponseTime;
         private (long Min, long Max, double Avg, long Last) _cachedStats;
         private bool _statsNeedUpdate = true;
+
+        public HopData(ILoggingService logger) =>
+            _logger = logger ??
+            throw new ArgumentNullException(nameof(logger));
 
         public int Sent
         {
@@ -323,13 +267,11 @@ namespace PingTestTool
             }
         }
 
-        private readonly object _lock = new();
-
         public void AddResponseTime(long time)
         {
             if (time < 0)
             {
-                Log.Error("[HopData] Ответное время не может быть отрицательным");
+                _logger.Error("[HopData] Ответное время не может быть отрицательным.");
                 throw new ArgumentOutOfRangeException(nameof(time), "Response time cannot be negative");
             }
 
@@ -344,6 +286,7 @@ namespace PingTestTool
         public double CalculateLossPercentage()
         {
             var lossPercentage = Sent == 0 ? 0 : (double)(Sent - Received) / Sent * 100;
+            _logger.Information($"[HopData] Процент потерь рассчитан: {lossPercentage:F2}%.");
             return lossPercentage;
         }
 
@@ -351,6 +294,7 @@ namespace PingTestTool
         {
             if (_responseTimes.IsEmpty)
             {
+                _logger.Warning("[HopData] Нет данных для расчета статистики.");
                 return (0, 0, 0, 0);
             }
 
@@ -388,7 +332,7 @@ namespace PingTestTool
                 Sent = 0;
                 Received = 0;
 
-                Log.Debug("[HopData] Очищена статистика");
+                _logger.Information("[HopData] Очищена статистика.");
             }
         }
 
@@ -403,72 +347,207 @@ namespace PingTestTool
             var max = times.Max();
             var avg = times.Average();
             var last = _lastResponseTime ?? times[times.Length - 1];
+            _logger.Information($"[HopData] Статистика рассчитана: Min={min}, Max={max}, Avg={avg:F2}, Last={last}.");
             return (min, max, avg, last);
         }
     }
 
-    public class PingManager : IPingManager
+    // -------------------- Implementations --------------------
+    public class DnsManager : ValidationBase, IDnsManager
     {
-        private const int BufferSize = 32;
-        private const int MaxTtl = 12;
-        private const int Timeout = 5000;
-        private const int ParallelRequests = 1;
-        private const int BaseDelay = 1000;
-        private const int MinDelay = 100;
-        private const double HighLossThreshold = 50;
-        private const double LowLossThreshold = 10;
+        private readonly IMemoryCache _dnsCache;
+        private readonly TimeSpan _dnsTimeout;
+        private readonly MemoryCacheEntryOptions _cacheOptions;
+        private readonly ILoggingService _logger;
 
+        public DnsManager(IMemoryCache memoryCache, ILoggingService logger, TimeSpan? dnsTimeout = null)
+        {
+            ValidateNotNull(memoryCache, nameof(memoryCache), logger);
+            ValidateNotNull(logger, nameof(logger), logger);
+
+            _dnsCache = memoryCache;
+            _logger = logger;
+            _dnsTimeout = dnsTimeout ?? TimeSpan.FromSeconds(5);
+            _cacheOptions = new MemoryCacheEntryOptions()
+                .SetAbsoluteExpiration(TimeSpan.FromMinutes(30))
+                .SetSlidingExpiration(TimeSpan.FromMinutes(10));
+        }
+
+        public async Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token)
+        {
+            ValidateNotNullOrEmpty(ipAddress, nameof(ipAddress), _logger);
+
+            if (!IPAddress.TryParse(ipAddress, out var parsedIp))
+            {
+                _logger.Error($"[DnsManager] Некорректный IP-адрес: {ipAddress}");
+                throw new ArgumentException("Некорректный IP-адрес", nameof(ipAddress));
+            }
+
+            return await ResolveDomainNameAsync(ipAddress, parsedIp, token);
+        }
+
+        private async Task<string> ResolveDomainNameAsync(string ipAddress, IPAddress parsedIp, CancellationToken token)
+        {
+            if (_dnsCache.TryGetValue(ipAddress, out string? cachedResult))
+            {
+                return cachedResult ?? Constants.DefaultUnresolvedValue;
+            }
+
+            try
+            {
+                var result = parsedIp.IsPrivate()
+                    ? GetLocalNetworkName(parsedIp)
+                    : await ResolveRemoteDomainNameAsync(parsedIp, token);
+
+                _dnsCache.Set(ipAddress, result, _cacheOptions);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"[DnsManager] Возвращен неразрешенный результат для IP: {ipAddress}", ex);
+                _dnsCache.Set(ipAddress, Constants.DefaultUnresolvedValue, _cacheOptions);
+                return Constants.DefaultUnresolvedValue;
+            }
+        }
+
+        private async Task<string> ResolveRemoteDomainNameAsync(IPAddress ip, CancellationToken token)
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(_dnsTimeout);
+            var hostEntry = await Dns.GetHostEntryAsync(ip);
+            return hostEntry.HostName;
+        }
+
+        private static string GetLocalNetworkName(IPAddress ip) => ip.AddressFamily switch
+        {
+            AddressFamily.InterNetworkV6 => GetLocalIpv6Name(ip),
+            AddressFamily.InterNetwork => GetLocalIpv4Name(ip),
+            _ => "Неизвестный локальный адрес"
+        };
+
+        private static string GetLocalIpv6Name(IPAddress ip) => ip switch
+        {
+            { IsIPv6LinkLocal: true } => "IPv6 Link-Local",
+            { IsIPv6SiteLocal: true } => "IPv6 Site-Local",
+            { IsIPv6Multicast: true } => "IPv6 Multicast",
+            _ => "Прочий IPv6 адрес"
+        };
+
+        private static string GetLocalIpv4Name(IPAddress ip) => ip switch
+        {
+            var addr when addr.IsInSubnet(IPAddress.Parse("192.168.0.0"), 16) => "Локальная сеть (Router)",
+            var addr when addr.IsInSubnet(IPAddress.Parse("10.0.0.0"), 8) => "DNS провайдера",
+            var addr when addr.IsInSubnet(IPAddress.Parse("172.16.0.0"), 12) => "Локальная сеть",
+            _ => "Прочий IPv4 адрес"
+        };
+    }
+
+    public static class NetworkExtensions
+    {
+        public static bool IsPrivate(this IPAddress ipAddress)
+        {
+            if (ipAddress == null) return false;
+
+            var bytes = ipAddress.GetAddressBytes();
+            return ipAddress.AddressFamily switch
+            {
+                AddressFamily.InterNetwork => IsPrivateIPv4(bytes),
+                AddressFamily.InterNetworkV6 => IsPrivateIPv6(bytes),
+                _ => false
+            };
+        }
+
+        public static bool IsInSubnet(this IPAddress ipAddress, IPAddress subnetMask, int prefixLength)
+        {
+            if (ipAddress == null || subnetMask == null || ipAddress.AddressFamily != subnetMask.AddressFamily)
+                return false;
+
+            var ipBytes = ipAddress.GetAddressBytes();
+            var subnetBytes = subnetMask.GetAddressBytes();
+
+            int fullBytes = prefixLength / 8;
+            int remainingBits = prefixLength % 8;
+
+            for (int i = 0; i < fullBytes; i++)
+            {
+                if (ipBytes[i] != subnetBytes[i])
+                    return false;
+            }
+
+            if (remainingBits > 0)
+            {
+                int mask = 0xFF << (8 - remainingBits);
+                return (ipBytes[fullBytes] & mask) == (subnetBytes[fullBytes] & mask);
+            }
+
+            return true;
+        }
+
+        private static bool IsPrivateIPv4(byte[] bytes) =>
+            bytes[0] == Constants.Network.PrivateNetworkAFirstByte ||
+            (bytes[0] == Constants.Network.PrivateNetworkBFirstByte &&
+             bytes[1] >= Constants.Network.PrivateNetworkBSecondByteStart &&
+             bytes[1] <= Constants.Network.PrivateNetworkBSecondByteEnd) ||
+            (bytes[0] == Constants.Network.PrivateNetworkCFirstByte &&
+             bytes[1] == Constants.Network.PrivateNetworkCSecondByte);
+
+        private static bool IsPrivateIPv6(byte[] bytes) =>
+            bytes[0] == 0xfc || bytes[0] == 0xfd;
+    }
+
+    public class PingManager : ValidationBase, IPingManager
+    {
         private readonly IDnsManager _dnsManager;
         private readonly ConcurrentDictionary<string, HopData> _hopData;
         private readonly byte[] _buffer;
+        private readonly ILoggingService _logger;
 
-        public PingManager(IDnsManager dnsManager)
+        public PingManager(IDnsManager dnsManager, ILoggingService logger)
         {
-            _dnsManager = dnsManager ?? throw new ArgumentNullException(nameof(dnsManager));
+            ValidateNotNull(dnsManager, nameof(dnsManager), logger);
+            ValidateNotNull(logger, nameof(logger), logger);
+
+            _dnsManager = dnsManager;
+            _logger = logger;
             _hopData = new ConcurrentDictionary<string, HopData>();
-            _buffer = new byte[BufferSize];
+            _buffer = new byte[Constants.Ping.BufferSize];
         }
 
         public async Task StartTraceAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback)
         {
-            ValidateHost(host);
+            ValidateNotNullOrEmpty(host, nameof(host), _logger);
+            ValidateNotNull(updateUiCallback, nameof(updateUiCallback), _logger);
 
             try
             {
-                while (!token.IsCancellationRequested)
-                {
-                    var (currentMaxTtl, delay) = CalculateTraceParameters();
-                    await ExecuteTraceRoundAsync(host, currentMaxTtl, updateUiCallback, token);
-                    await Task.Delay(delay, token);
-                }
+                await ExecuteTracingLoopAsync(host, token, updateUiCallback);
             }
             finally
             {
-                Log.Information("[PingManager] Завершение трассировки для хоста: {Host}", host);
+                _logger.Information($"[PingManager] Завершение трассировки для хоста: {host}");
             }
         }
 
         public void ClearHopData()
         {
             _hopData.Clear();
-            Log.Debug("[PingManager] Очищена статистика по хопам");
+            _logger.Information("[PingManager] Очищена статистика по хопам");
         }
 
-        private static void ValidateHost(string host)
+        private async Task ExecuteTracingLoopAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback)
         {
-            if (string.IsNullOrWhiteSpace(host))
+            while (!token.IsCancellationRequested)
             {
-                const string message = "Хост не может быть null или пустым.";
-                Log.Error("[PingManager] {Message}", message);
-                throw new ArgumentNullException(nameof(host), message);
+                var (maxTtl, delay) = GetTraceParameters();
+                await ExecuteTraceRoundAsync(host, maxTtl, updateUiCallback, token);
+                await Task.Delay(delay, token);
             }
         }
 
-        private (int MaxTtl, int Delay) CalculateTraceParameters()
+        private (int MaxTtl, int Delay) GetTraceParameters()
         {
             var stats = CalculateLossStatistics();
-            int delay = CalculateAdaptiveDelay(stats.LossPercentage);
-            return (MaxTtl, delay);
+            return (Constants.Ping.MaxTtl, CalculateAdaptiveDelay(stats.LossPercentage));
         }
 
         private (int TotalSent, int TotalReceived, double LossPercentage) CalculateLossStatistics()
@@ -479,14 +558,12 @@ namespace PingTestTool
             return (totalSent, totalReceived, lossPercentage);
         }
 
-        private static int CalculateAdaptiveDelay(double lossPercentage)
+        private static int CalculateAdaptiveDelay(double lossPercentage) => lossPercentage switch
         {
-            if (lossPercentage > HighLossThreshold)
-                return Math.Min(Timeout, (int)(BaseDelay * 1.5));
-            if (lossPercentage < LowLossThreshold)
-                return Math.Max(MinDelay, (int)(BaseDelay * 0.75));
-            return BaseDelay;
-        }
+            > Constants.Ping.HighLossThreshold => Math.Min(Constants.Ping.Timeout, (int)(Constants.Ping.BaseDelay * 1.5)),
+            < Constants.Ping.LowLossThreshold => Math.Max(Constants.Ping.MinDelay, (int)(Constants.Ping.BaseDelay * 0.75)),
+            _ => Constants.Ping.BaseDelay
+        };
 
         private async Task ExecuteTraceRoundAsync(string host, int maxTtl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
         {
@@ -497,7 +574,7 @@ namespace PingTestTool
 
         private async Task ExecutePingForTtlAsync(string host, int ttl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
         {
-            var pingTasks = Enumerable.Range(0, ParallelRequests)
+            var pingTasks = Enumerable.Range(0, Constants.Ping.ParallelRequests)
                 .Select(_ => ExecuteSinglePingAsync(host, ttl, updateUiCallback, token));
             await Task.WhenAll(pingTasks);
         }
@@ -515,7 +592,7 @@ namespace PingTestTool
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                LogPingError(ex, host, ttl);
+                _logger.Error(ex, $"[PingManager] Ошибка при пинге {host} с TTL {ttl}: {ex.Message}");
             }
         }
 
@@ -524,7 +601,7 @@ namespace PingTestTool
             token.ThrowIfCancellationRequested();
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var reply = await pingSender.SendPingAsync(host, Timeout, _buffer, new PingOptions { Ttl = ttl });
+            var reply = await pingSender.SendPingAsync(host, Constants.Ping.Timeout, _buffer, new PingOptions { Ttl = ttl });
             stopwatch.Stop();
 
             return (reply, stopwatch.ElapsedMilliseconds);
@@ -535,7 +612,7 @@ namespace PingTestTool
             string ipAddress = reply.Address?.ToString() ?? "Неизвестный адрес";
             if (IsValidIpAddress(ipAddress))
             {
-                var hop = _hopData.GetOrAdd(ipAddress, _ => new HopData());
+                var hop = _hopData.GetOrAdd(ipAddress, _ => new HopData(_logger));
                 UpdateHopStatistics(hop, reply, responseTime);
 
                 string domainName = await _dnsManager.GetDomainNameAsync(ipAddress, token);
@@ -555,79 +632,87 @@ namespace PingTestTool
                 hop.AddResponseTime(responseTime);
             }
         }
-
-        private static void LogPingError(Exception ex, string host, int ttl)
-        {
-            string errorType = ex is PingException ? "Ошибка пинга" : "Непредвиденная ошибка";
-            Log.Error(ex, "[PingManager] {ErrorType} при пинге {Host} с TTL {Ttl}: {Message}", errorType, host, ttl, ex.Message);
-        }
     }
 
-    public interface IPingManager
-    {
-        Task StartTraceAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback);
-        void ClearHopData();
-    }
-
-    public class TraceManager : IDisposable
+    public class TraceManager : ValidationBase, IDisposable
     {
         private CancellationTokenSource? _cts;
-        private bool _isTracing;
         private bool _disposed;
-        private readonly string _traceUrl;
-        private readonly ObservableCollection<TraceResult> _traceResults;
-        private readonly IMemoryCache _memoryCache;
         private readonly IPingManager _pingManager;
         private readonly IDnsManager _dnsManager;
+        private readonly ILoggingService _logger;
+        private readonly ObservableCollection<TraceResult> _traceResults;
+        private readonly IMemoryCache _memoryCache;
+        private bool _isTracing;
 
         public ObservableCollection<TraceResult> TraceResults => _traceResults;
-        public string TraceUrl => _traceUrl;
-        public bool IsTracing => _isTracing;
-
-        public TraceManager(string url)
+        public string TraceUrl { get; }
+        public bool IsTracing
         {
-            _traceUrl = url ?? throw new ArgumentNullException(nameof(url), "URL не может быть null.");
-            _traceResults = new ObservableCollection<TraceResult>();
-            _memoryCache = new MemoryCache(new MemoryCacheOptions());
-            _dnsManager = new DnsManager(_memoryCache);
-            _pingManager = new PingManager(_dnsManager);
+            get => _isTracing;
+            private set => _isTracing = value;
+        }
 
-            Log.Information("[TraceManager] Инициализирован с URL: {Url}", url);
+        public TraceManager(string url, ILoggingService logger)
+        {
+            ValidateNotNullOrEmpty(url, nameof(url), logger);
+            ValidateNotNull(logger, nameof(logger), logger);
+
+            TraceUrl = url;
+            _logger = logger;
+            _traceResults = new ObservableCollection<TraceResult>();
+
+            _memoryCache = new MemoryCache(new MemoryCacheOptions());
+            _dnsManager = new DnsManager(_memoryCache, logger);
+            _pingManager = new PingManager(_dnsManager, logger);
+
+            _logger.Information($"[TraceManager] Инициализирован с URL: {url}");
         }
 
         public async Task StartTraceAsync(Action<string, Color> updateStatus, Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
         {
-            if (_isTracing)
+            if (!ValidateTraceStart(showMessage)) return;
+
+            IsTracing = true;
+            updateStatus("Трассировка запущена...", Colors.Green);
+            _logger.Information($"[TraceManager] Запуск трассировки для URL: {TraceUrl}");
+
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+
+            try
+            {
+                await _pingManager.StartTraceAsync(TraceUrl, _cts.Token, UpdateHopStatistics);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.Warning("[TraceManager] Трассировка отменена");
+            }
+            catch (Exception ex)
+            {
+                HandleTraceError(ex, showMessage);
+            }
+            finally
+            {
+                ResetTraceStatus(updateStatus);
+            }
+        }
+
+        private bool ValidateTraceStart(Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
+        {
+            if (IsTracing)
             {
                 showMessage("Трассировка уже запущена.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                Log.Warning("[TraceManager] Попытка запустить уже запущенную трассировку");
-                return;
+                _logger.Warning("[TraceManager] Попытка запустить уже запущенную трассировку");
+                return false;
             }
+            return true;
+        }
 
-            _isTracing = true;
-            updateStatus("Трассировка запущена...", Colors.Green);
-            Log.Information("[TraceManager] Запуск трассировки для URL: {Url}", _traceUrl);
-
-            using (_cts = new CancellationTokenSource())
-            {
-                try
-                {
-                    await _pingManager.StartTraceAsync(_traceUrl, _cts.Token, UpdateHopStatistics);
-                }
-                catch (OperationCanceledException)
-                {
-                    Log.Warning("[TraceManager] Трассировка отменена");
-                }
-                catch (Exception ex)
-                {
-                    Log.Error(ex, "[TraceManager] Ошибка: {Message}", ex.Message);
-                    showMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                finally
-                {
-                    ResetTraceStatus(updateStatus);
-                }
-            }
+        private void HandleTraceError(Exception ex, Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
+        {
+            _logger.Error(ex, $"[TraceManager] Ошибка: {ex.Message}");
+            showMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         public void StopTrace()
@@ -635,11 +720,11 @@ namespace PingTestTool
             try
             {
                 _cts?.Cancel();
-                Log.Information("[TraceManager] Трассировка остановлена");
+                _logger.Information("[TraceManager] Трассировка остановлена");
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "[TraceManager] Ошибка при остановке трассировки");
+                _logger.Error(ex, "[TraceManager] Ошибка при остановке трассировки");
             }
         }
 
@@ -647,14 +732,14 @@ namespace PingTestTool
         {
             _traceResults.Clear();
             _pingManager.ClearHopData();
-            Log.Information("[TraceManager] Результаты очищены");
+            _logger.Information("[TraceManager] Результаты очищены");
         }
 
         private void UpdateHopStatistics(string ipAddress, int ttl, string domainName, HopData hop)
         {
             if (string.IsNullOrEmpty(ipAddress))
             {
-                Log.Warning("[TraceManager] Получен пустой IP-адрес");
+                _logger.Warning("[TraceManager] Получен пустой IP-адрес");
                 return;
             }
 
@@ -666,27 +751,27 @@ namespace PingTestTool
 
                     if (existingResult is null)
                     {
-                        _traceResults.Add(new TraceResult(ttl, ipAddress, domainName, hop));
-                        Log.Debug("[TraceManager] Добавлен новый результат для IP: {IpAddress}", ipAddress);
+                        _traceResults.Add(new TraceResult(_logger, ttl, ipAddress, domainName, hop));
+                        _logger.Information($"[TraceManager] Добавлен новый результат для IP: {ipAddress}");
                     }
                     else
                     {
                         existingResult.UpdateStatistics(hop);
-                        Log.Debug("[TraceManager] Обновлена статистика для IP: {IpAddress}", ipAddress);
+                        _logger.Information($"[TraceManager] Обновлена статистика для IP: {ipAddress}");
                     }
                 });
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "[TraceManager] Ошибка при обновлении статистики хопа");
+                _logger.Error(ex, "[TraceManager] Ошибка при обновлении статистики хопа");
             }
         }
 
         private void ResetTraceStatus(Action<string, Color> updateStatus)
         {
-            _isTracing = false;
+            IsTracing = false;
             updateStatus("Трассировка остановлена.", Colors.Red);
-            Log.Information("[TraceManager] Статус трассировки сброшен");
+            _logger.Information("[TraceManager] Статус трассировки сброшен");
         }
 
         public void Dispose()
@@ -714,28 +799,21 @@ namespace PingTestTool
         }
     }
 
-    public interface ITraceWindow
-    {
-        bool IsLoaded { get; }
-        bool IsVisible { get; }
-        Visibility Visibility { get; set; }
-        void Show();
-        void Close();
-        event EventHandler Closed;
-    }
-
     public partial class TraceWindow : Window, ITraceWindow
     {
         private readonly TraceManager _traceManager;
+        private readonly ILoggingService _logger;
+
         public ICollectionView TraceResults { get; }
 
-        public TraceWindow(string url)
+        public TraceWindow(string url, ILoggingService logger)
         {
             InitializeComponent();
-            _traceManager = new TraceManager(url);
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _traceManager = new TraceManager(url, _logger);
 
             TraceResults = ConfigureTraceResults();
-            Log.Information("[TraceWindow] Инициализирован с URL: {Url}", url);
+            _logger.Information($"[TraceWindow] Инициализирован с URL: {url}");
         }
 
         private ICollectionView ConfigureTraceResults()
@@ -746,12 +824,16 @@ namespace PingTestTool
             return view;
         }
 
+        private async void BtnStartTrace_Click(object sender, RoutedEventArgs e)
+        {
+            await HandleTraceStartAsync();
+        }
+
         private async Task HandleTraceStartAsync()
         {
             if (!ValidateTraceStart()) return;
 
             SetTraceControlsState(isStarting: true);
-            UpdateStatus("Трассировка запущена...", Colors.Green);
             await _traceManager.StartTraceAsync(UpdateStatus, ShowMessage);
         }
 
@@ -760,14 +842,14 @@ namespace PingTestTool
             if (_traceManager.IsTracing)
             {
                 ShowMessage("Трассировка уже запущена.", "Предупреждение");
-                Log.Warning("[TraceWindow] Попытка запустить уже запущенную трассировку");
+                _logger.Warning("[TraceWindow] Попытка запустить уже запущенную трассировку");
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(_traceManager.TraceUrl))
             {
                 ShowMessage("Пожалуйста, укажите URL для трассировки.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                Log.Error("[TraceWindow] URL для трассировки не указан");
+                _logger.Error("[TraceWindow] URL для трассировки не указан");
                 return false;
             }
 
@@ -780,12 +862,12 @@ namespace PingTestTool
             {
                 File.WriteAllLines(fileName, _traceManager.TraceResults.Select(result => result?.ToString() ?? "Пустой результат"));
                 ShowMessage("Результаты успешно сохранены.", "Успех");
-                Log.Information("[TraceWindow] Результаты сохранены в файл: {FileName}", fileName);
+                _logger.Information($"[TraceWindow] Результаты сохранены в файл: {fileName}");
             }
             catch (Exception ex)
             {
                 ShowMessage($"Ошибка при сохранении результатов: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                Log.Error(ex, "[TraceWindow] Ошибка при сохранении результатов: {Message}", ex.Message);
+                _logger.Error(ex, $"[TraceWindow] Ошибка при сохранении результатов: {ex.Message}");
             }
         }
 
@@ -802,20 +884,14 @@ namespace PingTestTool
         private void BtnClearResults_Click(object sender, RoutedEventArgs e)
         {
             _traceManager.ClearResults();
-            Log.Information("[TraceWindow] Результаты очищены");
-        }
-
-        private async void BtnStartTrace_Click(object sender, RoutedEventArgs e)
-        {
-            SetTraceControlsState(isStarting: true);
-            await HandleTraceStartAsync();
+            _logger.Information("[TraceWindow] Результаты очищены");
         }
 
         private void BtnStopTrace_Click(object sender, RoutedEventArgs e)
         {
             _traceManager.StopTrace();
             UpdateStatus("Остановка трассировки...", Colors.Orange);
-            Log.Information("[TraceWindow] Трассировка остановлена");
+            _logger.Information("[TraceWindow] Трассировка остановлена");
             SetTraceControlsState(isStarting: false);
         }
 
