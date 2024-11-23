@@ -21,16 +21,6 @@ namespace PingTestTool
             public const double HighLossThreshold = 50;
             public const double LowLossThreshold = 10;
         }
-
-        public static class Network
-        {
-            public const byte PrivateNetworkAFirstByte = 10;
-            public const byte PrivateNetworkBFirstByte = 172;
-            public const byte PrivateNetworkBSecondByteStart = 16;
-            public const byte PrivateNetworkBSecondByteEnd = 31;
-            public const byte PrivateNetworkCFirstByte = 192;
-            public const byte PrivateNetworkCSecondByte = 168;
-        }
     }
 
     // -------------------- Interfaces --------------------
@@ -339,116 +329,39 @@ namespace PingTestTool
                 throw new ArgumentException("Некорректный IP-адрес", nameof(ipAddress));
             }
 
+            // Попробуем найти результат в кэше
+            if (_dnsCache.TryGetValue(ipAddress, out string? cachedResult))
+            {
+                _logger.Information($"[DnsManager] Кэш найден для {ipAddress}: {cachedResult}");
+                return cachedResult ?? Constants.DefaultUnresolvedValue;
+            }
+
+            // Если не найдено, попытаться разрешить имя
             return await ResolveDomainNameAsync(ipAddress, parsedIp, token);
         }
 
         private async Task<string> ResolveDomainNameAsync(string ipAddress, IPAddress parsedIp, CancellationToken token)
         {
-            if (_dnsCache.TryGetValue(ipAddress, out string? cachedResult))
-            {
-                return cachedResult ?? Constants.DefaultUnresolvedValue;
-            }
-
             try
             {
-                var result = parsedIp.IsPrivate()
-                    ? GetLocalNetworkName(parsedIp)
-                    : await ResolveRemoteDomainNameAsync(parsedIp, token);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                cts.CancelAfter(_dnsTimeout);
 
+                var hostEntry = await Dns.GetHostEntryAsync(parsedIp);
+                string result = hostEntry.HostName;
+
+                // Сохранение результата в кэше
                 _dnsCache.Set(ipAddress, result, _cacheOptions);
+                _logger.Information($"[DnsManager] DNS-имя для {ipAddress}: {result}");
                 return result;
             }
             catch (Exception ex)
             {
-                _logger.Warning($"[DnsManager] Возвращен неразрешенный результат для IP: {ipAddress}", ex);
+                _logger.Warning($"[DnsManager] Ошибка при разрешении DNS для {ipAddress}: {ex.Message}");
                 _dnsCache.Set(ipAddress, Constants.DefaultUnresolvedValue, _cacheOptions);
                 return Constants.DefaultUnresolvedValue;
             }
         }
-
-        private async Task<string> ResolveRemoteDomainNameAsync(IPAddress ip, CancellationToken token)
-        {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-            cts.CancelAfter(_dnsTimeout);
-            var hostEntry = await Dns.GetHostEntryAsync(ip);
-            return hostEntry.HostName;
-        }
-
-        private static string GetLocalNetworkName(IPAddress ip) => ip.AddressFamily switch
-        {
-            AddressFamily.InterNetworkV6 => GetLocalIpv6Name(ip),
-            AddressFamily.InterNetwork => GetLocalIpv4Name(ip),
-            _ => "Неизвестный локальный адрес"
-        };
-
-        private static string GetLocalIpv6Name(IPAddress ip) => ip switch
-        {
-            { IsIPv6LinkLocal: true } => "IPv6 Link-Local",
-            { IsIPv6SiteLocal: true } => "IPv6 Site-Local",
-            { IsIPv6Multicast: true } => "IPv6 Multicast",
-            _ => "Прочий IPv6 адрес"
-        };
-
-        private static string GetLocalIpv4Name(IPAddress ip) => ip switch
-        {
-            var addr when addr.IsInSubnet(IPAddress.Parse("192.168.0.0"), 16) => "Локальная сеть (Router)",
-            var addr when addr.IsInSubnet(IPAddress.Parse("10.0.0.0"), 8) => "DNS провайдера",
-            var addr when addr.IsInSubnet(IPAddress.Parse("172.16.0.0"), 12) => "Локальная сеть",
-            _ => "Прочий IPv4 адрес"
-        };
-    }
-
-    public static class NetworkExtensions
-    {
-        public static bool IsPrivate(this IPAddress ipAddress)
-        {
-            if (ipAddress == null) return false;
-
-            var bytes = ipAddress.GetAddressBytes();
-            return ipAddress.AddressFamily switch
-            {
-                AddressFamily.InterNetwork => IsPrivateIPv4(bytes),
-                AddressFamily.InterNetworkV6 => IsPrivateIPv6(bytes),
-                _ => false
-            };
-        }
-
-        public static bool IsInSubnet(this IPAddress ipAddress, IPAddress subnetMask, int prefixLength)
-        {
-            if (ipAddress == null || subnetMask == null || ipAddress.AddressFamily != subnetMask.AddressFamily)
-                return false;
-
-            var ipBytes = ipAddress.GetAddressBytes();
-            var subnetBytes = subnetMask.GetAddressBytes();
-
-            int fullBytes = prefixLength / 8;
-            int remainingBits = prefixLength % 8;
-
-            for (int i = 0; i < fullBytes; i++)
-            {
-                if (ipBytes[i] != subnetBytes[i])
-                    return false;
-            }
-
-            if (remainingBits > 0)
-            {
-                int mask = 0xFF << (8 - remainingBits);
-                return (ipBytes[fullBytes] & mask) == (subnetBytes[fullBytes] & mask);
-            }
-
-            return true;
-        }
-
-        private static bool IsPrivateIPv4(byte[] bytes) =>
-            bytes[0] == Constants.Network.PrivateNetworkAFirstByte ||
-            (bytes[0] == Constants.Network.PrivateNetworkBFirstByte &&
-             bytes[1] >= Constants.Network.PrivateNetworkBSecondByteStart &&
-             bytes[1] <= Constants.Network.PrivateNetworkBSecondByteEnd) ||
-            (bytes[0] == Constants.Network.PrivateNetworkCFirstByte &&
-             bytes[1] == Constants.Network.PrivateNetworkCSecondByte);
-
-        private static bool IsPrivateIPv6(byte[] bytes) =>
-            bytes[0] == 0xfc || bytes[0] == 0xfd;
     }
 
     public class PingManager : ValidationBase, IPingManager
