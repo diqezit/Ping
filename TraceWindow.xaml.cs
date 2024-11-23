@@ -173,6 +173,7 @@ namespace PingTestTool
             IPAddress = ipAddress;
             DomainName = domainName;
             UpdateStatistics(hop);
+            _logger.Information($"[TraceResult] Обновлена статистика для IP: {ipAddress}");
         }
 
         public void UpdateStatistics(HopData hop)
@@ -416,7 +417,7 @@ namespace PingTestTool
         private (int MaxTtl, int Delay) GetTraceParameters()
         {
             var stats = CalculateLossStatistics();
-            return (Constants.Ping.MaxTtl, CalculateAdaptiveDelay(stats.LossPercentage));
+            return (Constants.Ping.MaxTtl, CalculateAdaptiveDelay(stats));
         }
 
         private (int TotalSent, int TotalReceived, double LossPercentage) CalculateLossStatistics()
@@ -427,28 +428,43 @@ namespace PingTestTool
             return (totalSent, totalReceived, lossPercentage);
         }
 
-        private static int CalculateAdaptiveDelay(double lossPercentage) => lossPercentage switch
+        private int CalculateAdaptiveDelay((int TotalSent, int TotalReceived, double LossPercentage) stats)
         {
-            > Constants.Ping.HighLossThreshold => Math.Min(Constants.Ping.Timeout, (int)(Constants.Ping.BaseDelay * 1.5)),
-            < Constants.Ping.LowLossThreshold => Math.Max(Constants.Ping.MinDelay, (int)(Constants.Ping.BaseDelay * 0.75)),
-            _ => Constants.Ping.BaseDelay
-        };
+            return stats.LossPercentage switch
+            {
+                > Constants.Ping.HighLossThreshold => Math.Min(Constants.Ping.Timeout, (int)(Constants.Ping.BaseDelay * 1.5)),
+                < Constants.Ping.LowLossThreshold => Math.Max(Constants.Ping.MinDelay, (int)(Constants.Ping.BaseDelay * 0.75)),
+                _ => Constants.Ping.BaseDelay
+            };
+        }
 
-        private async Task ExecuteTraceRoundAsync(string host, int maxTtl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+        private async Task ExecuteTraceRoundAsync(
+            string host, int maxTtl, 
+            Action<string, int, string,
+            HopData> updateUiCallback, 
+            CancellationToken token)
         {
             var pingTasks = Enumerable.Range(1, maxTtl)
                 .Select(ttl => ExecutePingForTtlAsync(host, ttl, updateUiCallback, token));
             await Task.WhenAll(pingTasks);
         }
 
-        private async Task ExecutePingForTtlAsync(string host, int ttl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+        private async Task ExecutePingForTtlAsync(
+            string host, int ttl, 
+            Action<string, int, string,
+            HopData> updateUiCallback, 
+            CancellationToken token)
         {
             var pingTasks = Enumerable.Range(0, Constants.Ping.ParallelRequests)
                 .Select(_ => ExecuteSinglePingAsync(host, ttl, updateUiCallback, token));
             await Task.WhenAll(pingTasks);
         }
 
-        private async Task ExecuteSinglePingAsync(string host, int ttl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+        private async Task ExecuteSinglePingAsync(
+            string host, int ttl, 
+            Action<string, int, string, 
+            HopData> updateUiCallback, 
+            CancellationToken token)
         {
             using var pingSender = new Ping();
             try
@@ -459,9 +475,13 @@ namespace PingTestTool
                     await ProcessPingReplyAsync(reply, ttl, responseTime, updateUiCallback, token);
                 }
             }
+            catch (PingException ex)
+            {
+                _logger.Warning($"[PingManager] Ошибка пинга {host} с TTL {ttl}: {ex.Message}");
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.Error(ex, $"[PingManager] Ошибка при пинге {host} с TTL {ttl}: {ex.Message}");
+                _logger.Error(ex, $"[PingManager] Непредвиденная ошибка: {ex.Message}");
             }
         }
 
@@ -469,23 +489,41 @@ namespace PingTestTool
         {
             token.ThrowIfCancellationRequested();
 
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var stopwatch = Stopwatch.StartNew();
             var reply = await pingSender.SendPingAsync(host, Constants.Ping.Timeout, _buffer, new PingOptions { Ttl = ttl });
             stopwatch.Stop();
 
             return (reply, stopwatch.ElapsedMilliseconds);
         }
 
-        private async Task ProcessPingReplyAsync(PingReply reply, int ttl, long responseTime, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+        private async Task ProcessPingReplyAsync(
+            PingReply reply, 
+            int ttl, long responseTime, 
+            Action<string, int, string, 
+            HopData> updateUiCallback, 
+            CancellationToken token)
         {
-            string ipAddress = reply.Address?.ToString() ?? "Неизвестный адрес";
-            if (IsValidIpAddress(ipAddress))
-            {
-                var hop = _hopData.GetOrAdd(ipAddress, _ => new HopData(_logger));
-                UpdateHopStatistics(hop, reply, responseTime);
+            var ipAddress = reply.Address?.ToString() ?? "Неизвестный адрес";
+            if (!IsValidIpAddress(ipAddress)) return;
 
-                string domainName = await _dnsManager.GetDomainNameAsync(ipAddress, token);
+            var hop = _hopData.GetOrAdd(ipAddress, key => new HopData(_logger));
+
+            UpdateHopStatistics(hop, reply, responseTime);
+
+            try
+            {
+                var domainName = await _dnsManager.GetDomainNameAsync(ipAddress, token);
                 updateUiCallback(ipAddress, ttl, domainName, hop);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.Warning($"[PingManager] Запрос доменного имени для {ipAddress} отменен.");
+                updateUiCallback(ipAddress, ttl, ipAddress, hop); 
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"[PingManager] Не удалось получить доменное имя для {ipAddress}; используется IP. {ex.Message}");
+                updateUiCallback(ipAddress, ttl, ipAddress, hop); 
             }
         }
 
@@ -494,11 +532,14 @@ namespace PingTestTool
 
         private static void UpdateHopStatistics(HopData hop, PingReply reply, long responseTime)
         {
-            hop.Sent++;
-            if (reply.Status is IPStatus.Success or IPStatus.TtlExpired or IPStatus.TimeExceeded)
+            lock (hop) // минимизация гонок
             {
-                hop.Received++;
-                hop.AddResponseTime(responseTime);
+                hop.Sent++;
+                if (reply.Status is IPStatus.Success or IPStatus.TtlExpired or IPStatus.TimeExceeded)
+                {
+                    hop.Received++;
+                    hop.AddResponseTime(responseTime);
+                }
             }
         }
     }
