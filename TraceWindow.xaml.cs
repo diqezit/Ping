@@ -58,7 +58,7 @@ namespace PingTestTool
     // -------------------- Models --------------------
     public abstract class ObservableBase : INotifyPropertyChanged
     {
-        private readonly Dictionary<string, object> _propertyValues = new();
+        private readonly ConcurrentDictionary<string, object> _propertyValues = new();
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
@@ -68,9 +68,8 @@ namespace PingTestTool
         {
             if (propertyName == null) return false;
 
-            if (!_propertyValues.TryGetValue(propertyName, out var currentValue) ||
-                !ReferenceEquals(currentValue, value) &&
-                !EqualityComparer<T>.Default.Equals((T)currentValue, value))
+            var oldValue = _propertyValues.GetOrAdd(propertyName, default(T)!);
+            if (!EqualityComparer<T>.Default.Equals((T)oldValue, value))
             {
                 _propertyValues[propertyName] = value!;
                 OnPropertyChanged(propertyName);
@@ -79,13 +78,9 @@ namespace PingTestTool
             return false;
         }
 
-        protected T GetProperty<T>(T defaultValue = default!, [CallerMemberName] string? propertyName = null)
-        {
-            if (propertyName == null) return defaultValue;
-            return _propertyValues.TryGetValue(propertyName, out var value)
-                ? (T)value
-                : defaultValue;
-        }
+        protected T GetProperty<T>(T defaultValue = default!, [CallerMemberName] string? propertyName = null) =>
+            propertyName == null ? defaultValue :
+            (T)_propertyValues.GetOrAdd(propertyName, defaultValue!);
     }
 
     public abstract class ValidationBase
@@ -229,89 +224,72 @@ namespace PingTestTool
             $"{milliseconds}{Constants.MsUnitSuffix}";
     }
 
-    public class HopData
+    public sealed class HopData
     {
-        private readonly ConcurrentBag<long> _responseTimes = new();
-        private readonly object _statsLock = new();
+        private readonly ConcurrentQueue<long> _responseTimes = new();
         private readonly ILoggingService _logger;
-        private readonly object _lock = new();
+        private readonly object _statsLock = new();
 
         private volatile int _sent;
         private volatile int _received;
-
-        private long? _lastResponseTime;
+        private long _lastResponseTime;
         private (long Min, long Max, double Avg, long Last) _cachedStats;
-        private bool _statsNeedUpdate = true;
+        private volatile bool _statsNeedUpdate = true;
 
         public HopData(ILoggingService logger) =>
-            _logger = logger ??
-            throw new ArgumentNullException(nameof(logger));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         public int Sent
         {
             get => _sent;
-            set
-            {
-                Interlocked.Exchange(ref _sent, value);
-                _statsNeedUpdate = true;
-            }
+            set => Interlocked.Exchange(ref _sent, value);
         }
 
         public int Received
         {
             get => _received;
-            set
-            {
-                Interlocked.Exchange(ref _received, value);
-                _statsNeedUpdate = true;
-            }
+            set => Interlocked.Exchange(ref _received, value);
         }
 
         public void AddResponseTime(long time)
         {
             if (time < 0)
             {
-                _logger.Error("[HopData] Ответное время не может быть отрицательным.");
-                throw new ArgumentOutOfRangeException(nameof(time), "Response time cannot be negative");
+                _logger.Error("[HopData] Отрицательное время отклика");
+                throw new ArgumentOutOfRangeException(nameof(time));
             }
 
-            _responseTimes.Add(time);
-            lock (_lock)
-            {
-                _lastResponseTime = time;
-            }
+            _responseTimes.Enqueue(time);
+            Interlocked.Exchange(ref _lastResponseTime, time);
             _statsNeedUpdate = true;
         }
 
-        public double CalculateLossPercentage()
-        {
-            var lossPercentage = Sent == 0 ? 0 : (double)(Sent - Received) / Sent * 100;
-            _logger.Information($"[HopData] Процент потерь рассчитан: {lossPercentage:F2}%.");
-            return lossPercentage;
-        }
+        public double CalculateLossPercentage() =>
+            Sent == 0 ? 0 : (double)(Sent - Received) / Sent * 100;
 
         public (long Min, long Max, double Avg, long Last) GetStatistics()
         {
             if (_responseTimes.IsEmpty)
-            {
-                _logger.Warning("[HopData] Нет данных для расчета статистики.");
                 return (0, 0, 0, 0);
-            }
 
             if (!_statsNeedUpdate)
-            {
                 return _cachedStats;
-            }
 
             lock (_statsLock)
             {
                 if (!_statsNeedUpdate)
-                {
                     return _cachedStats;
-                }
 
-                var responseArray = _responseTimes.ToArray();
-                _cachedStats = CalculateStatistics(responseArray);
+                var times = _responseTimes.ToArray();
+                if (times.Length == 0)
+                    return (0, 0, 0, 0);
+
+                _cachedStats = (
+                    times.Min(),
+                    times.Max(),
+                    times.Average(),
+                    _lastResponseTime
+                );
                 _statsNeedUpdate = false;
                 return _cachedStats;
             }
@@ -321,34 +299,12 @@ namespace PingTestTool
         {
             lock (_statsLock)
             {
-                while (!_responseTimes.IsEmpty)
-                {
-                    _responseTimes.TryTake(out _);
-                }
-
-                _lastResponseTime = null;
+                while (_responseTimes.TryDequeue(out _)) { }
+                _lastResponseTime = 0;
                 _statsNeedUpdate = true;
                 _cachedStats = default;
-                Sent = 0;
-                Received = 0;
-
-                _logger.Information("[HopData] Очищена статистика.");
+                Sent = Received = 0;
             }
-        }
-
-        private (long Min, long Max, double Avg, long Last) CalculateStatistics(long[] times)
-        {
-            if (times == null || times.Length == 0)
-            {
-                return (0, 0, 0, 0);
-            }
-
-            var min = times.Min();
-            var max = times.Max();
-            var avg = times.Average();
-            var last = _lastResponseTime ?? times[times.Length - 1];
-            _logger.Information($"[HopData] Статистика рассчитана: Min={min}, Max={max}, Avg={avg:F2}, Last={last}.");
-            return (min, max, avg, last);
         }
     }
 
