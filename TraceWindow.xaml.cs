@@ -439,9 +439,9 @@ namespace PingTestTool
         }
 
         private async Task ExecuteTraceRoundAsync(
-            string host, int maxTtl, 
+            string host, int maxTtl,
             Action<string, int, string,
-            HopData> updateUiCallback, 
+            HopData> updateUiCallback,
             CancellationToken token)
         {
             var pingTasks = Enumerable.Range(1, maxTtl)
@@ -450,9 +450,9 @@ namespace PingTestTool
         }
 
         private async Task ExecutePingForTtlAsync(
-            string host, int ttl, 
+            string host, int ttl,
             Action<string, int, string,
-            HopData> updateUiCallback, 
+            HopData> updateUiCallback,
             CancellationToken token)
         {
             var pingTasks = Enumerable.Range(0, Constants.Ping.ParallelRequests)
@@ -461,9 +461,9 @@ namespace PingTestTool
         }
 
         private async Task ExecuteSinglePingAsync(
-            string host, int ttl, 
-            Action<string, int, string, 
-            HopData> updateUiCallback, 
+            string host, int ttl,
+            Action<string, int, string,
+            HopData> updateUiCallback,
             CancellationToken token)
         {
             using var pingSender = new Ping();
@@ -497,10 +497,10 @@ namespace PingTestTool
         }
 
         private async Task ProcessPingReplyAsync(
-            PingReply reply, 
-            int ttl, long responseTime, 
-            Action<string, int, string, 
-            HopData> updateUiCallback, 
+            PingReply reply,
+            int ttl, long responseTime,
+            Action<string, int, string,
+            HopData> updateUiCallback,
             CancellationToken token)
         {
             var ipAddress = reply.Address?.ToString() ?? "Неизвестный адрес";
@@ -518,12 +518,12 @@ namespace PingTestTool
             catch (OperationCanceledException)
             {
                 _logger.Warning($"[PingManager] Запрос доменного имени для {ipAddress} отменен.");
-                updateUiCallback(ipAddress, ttl, ipAddress, hop); 
+                updateUiCallback(ipAddress, ttl, ipAddress, hop);
             }
             catch (Exception ex)
             {
                 _logger.Warning($"[PingManager] Не удалось получить доменное имя для {ipAddress}; используется IP. {ex.Message}");
-                updateUiCallback(ipAddress, ttl, ipAddress, hop); 
+                updateUiCallback(ipAddress, ttl, ipAddress, hop);
             }
         }
 

@@ -2,8 +2,7 @@
 
 namespace PingTestTool
 {
-    // -------------------- Interfaces --------------------
-
+    #region Interfaces
     public interface IMainWindowHandler
     {
         void HandleWindowClosed(object? sender, EventArgs e);
@@ -32,9 +31,9 @@ namespace PingTestTool
         void HideAllWarnings();
         void ShowWarnings(ValidationResult result);
     }
+    #endregion
 
-    // -------------------- Models --------------------
-
+    #region Models
     public sealed class ValidationResult
     {
         public List<string> Errors { get; }
@@ -45,9 +44,9 @@ namespace PingTestTool
             Errors = errors ?? new List<string>();
         }
     }
+    #endregion
 
-    // -------------------- Implementations --------------------
-
+    #region Implementations
     public class SerilogLoggingService : ILoggingService
     {
         public void Information(string messageTemplate, params object[] propertyValues)
@@ -115,9 +114,9 @@ namespace PingTestTool
             }
         }
     }
+    #endregion
 
-    // -------------------- Helpers --------------------
-
+    #region Helpers
     public static class ValidationHelper
     {
         private static readonly Regex CyrillicRegex = new(@"[\u0400-\u04FF]", RegexOptions.Compiled);
@@ -169,9 +168,9 @@ namespace PingTestTool
             return errors;
         }
     }
+    #endregion
 
-    // -------------------- Event Handlers --------------------
-
+    #region Event Handlers
     public class MainWindowEventHandler : IMainWindowHandler
     {
         private readonly MainWindow _mainWindow;
@@ -465,9 +464,9 @@ namespace PingTestTool
             }
         }
     }
+    #endregion
 
-    // -------------------- Main Window --------------------
-
+    #region Main Window
     public partial class MainWindow : Window
     {
         public const string DEFAULT_URL = "8.8.8.8";
@@ -551,4 +550,5 @@ namespace PingTestTool
             _eventHandler?.HandleTraceRouteButtonClick();
         }
     }
+    #endregion
 }

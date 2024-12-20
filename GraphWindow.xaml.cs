@@ -2,14 +2,15 @@
 
 namespace PingTestTool
 {
-    // -------------------- Constants --------------------
+    #region Constants
     public static class Constant
     {
         public const int MaxVisiblePoints = 100;
         public const int MinPingInterval = 100;
     }
+    #endregion
 
-    // -------------------- Interfaces --------------------
+    #region Interfaces
     public interface IGraphWindow
     {
         bool IsLoaded { get; }
@@ -35,15 +36,17 @@ namespace PingTestTool
         void SetPingData(IEnumerable<int> data);
         PingStatistics GetStatistics(List<int> data);
     }
+    #endregion
 
-    // -------------------- Data Structures --------------------
+    #region Data Structures
     public readonly record struct PingStatistics(
         double Min,
         double Avg,
         double Max,
         double Cur);
+    #endregion
 
-    // -------------------- Implementations --------------------
+    #region Implementations
     public partial class GraphWindow : Window, INotifyPropertyChanged, IDisposable, IGraphWindow
     {
         private readonly ILoggingService _logger;
@@ -152,10 +155,8 @@ namespace PingTestTool
         {
             _plotModel = plotModel;
             _updateTextFields = updateTextFields;
-            _statisticsManager = statisticsManager ??
-                throw new ArgumentNullException(nameof(statisticsManager));
-            _logger = logger ??
-                throw new ArgumentNullException(nameof(logger));
+            _statisticsManager = statisticsManager ?? throw new ArgumentNullException(nameof(statisticsManager));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _normalSeries = new LineSeries
             {
@@ -330,4 +331,5 @@ namespace PingTestTool
             _disposed = true;
         }
     }
+    #endregion
 }

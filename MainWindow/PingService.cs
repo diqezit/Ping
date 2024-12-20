@@ -2,7 +2,7 @@
 
 namespace PingTestTool
 {
-    // -------------------- Constants --------------------
+    #region Constants
     public static class PingServiceConstants
     {
         public const int BUFFER_SIZE = 32;
@@ -11,8 +11,9 @@ namespace PingTestTool
         public const string LOG_SEPARATOR = "══════════════════════════════════════════════════════════";
         public const string LOG_MINI_SEPARATOR = "──────────────────────────────────────";
     }
+    #endregion
 
-    // -------------------- Interfaces --------------------
+    #region Interfaces
     public interface IPingConfiguration
     {
         string Url { get; }
@@ -61,7 +62,24 @@ namespace PingTestTool
         Task<(int Min, int Max, double Average)> CalculateStatisticsAsync(IReadOnlyList<int> roundtripTimes);
     }
 
-    // -------------------- Implementation Classes --------------------
+    public interface IReportGenerator
+    {
+        void InitializeLogBuilder(StringBuilder logBuilder, IPingConfiguration config, DateTime startTime);
+        Task<string> GenerateFinalReport(
+            StringBuilder logBuilder,
+            StringBuilder responseTimes,
+            DateTime startTime,
+            DateTime endTime,
+            TimeSpan executionTime,
+            double avgJitter,
+            int successfulPings,
+            int failedPings,
+            int totalPings,
+            IReadOnlyList<int> roundtripTimes);
+    }
+    #endregion
+
+    #region Implementation Classes
     public sealed class PingService : IPingTestService
     {
         private readonly List<int> _roundtripTimes = new();
@@ -196,7 +214,6 @@ namespace PingTestTool
             return (successfulPings, failedPings, responseTimes);
         }
 
-        // Rest of the class implementation remains the same
         private async Task AddRoundtripTimeAsync(int roundtripTime, CancellationToken cancellationToken)
         {
             await _lock.WaitAsync(cancellationToken);
@@ -273,7 +290,6 @@ namespace PingTestTool
         }
     }
 
-    // -------------------- Supporting Classes --------------------
     public class PingExecutor : IPingExecutor
     {
         private readonly ILoggingService _logger;
@@ -390,22 +406,6 @@ namespace PingTestTool
         }
     }
 
-    public interface IReportGenerator
-    {
-        void InitializeLogBuilder(StringBuilder logBuilder, IPingConfiguration config, DateTime startTime);
-        Task<string> GenerateFinalReport(
-            StringBuilder logBuilder,
-            StringBuilder responseTimes,
-            DateTime startTime,
-            DateTime endTime,
-            TimeSpan executionTime,
-            double avgJitter,
-            int successfulPings,
-            int failedPings,
-            int totalPings,
-            IReadOnlyList<int> roundtripTimes);
-    }
-
     public class ReportGenerator : IReportGenerator
     {
         private readonly ILoggingService _logger;
@@ -494,8 +494,9 @@ namespace PingTestTool
             return $"{time.TotalSeconds:F2} секунд";
         }
     }
+    #endregion
 
-    // -------------------- Model Classes --------------------
+    #region Model Classes
     public class PingConfiguration : IPingConfiguration
     {
         public string Url { get; }
@@ -574,4 +575,5 @@ namespace PingTestTool
         int RoundtripTime,
         string Message,
         long ElapsedMilliseconds);
+    #endregion
 }
