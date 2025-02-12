@@ -1,827 +1,443 @@
 ﻿#nullable enable
+using System;
+using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Data;
+using System.Windows.Media;
+using Microsoft.Extensions.Caching.Memory;
 
-namespace PingTestTool
+namespace PingTestTool;
+
+public static class Constants
 {
-    // -------------------- Constants --------------------
-    public static class Constants
+    public const string DefaultUnresolvedValue = "---";
+    public const string MsUnitSuffix = " ms";
+    public const string PercentageSuffix = "%";
+    public const string DefaultFormat = "F0";
+    public static class Ping
     {
-        public const string DefaultUnresolvedValue = "---";
-        public const string MsUnitSuffix = " ms";
-        public const string PercentageSuffix = "%";
-        public const string DefaultFormat = "F0";
+        public const int BufferSize = 32;
+        public const int MaxTtl = 12;
+        public const int Timeout = 5000;
+        public const int ParallelRequests = 1;
+        public const int BaseDelay = 1000;
+        public const int MinDelay = 100;
+        public const double HighLossThreshold = 50;
+        public const double LowLossThreshold = 10;
+    }
+}
 
-        public static class Ping
+public interface IDnsManager
+{
+    Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token);
+}
+
+public interface IPingManager
+{
+    Task StartTraceAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback);
+    void ClearHopData();
+}
+
+public interface ITraceWindow
+{
+    bool IsLoaded { get; }
+    bool IsVisible { get; }
+    Visibility Visibility { get; set; }
+    void Show();
+    void Close();
+    event EventHandler Closed;
+}
+
+public abstract class ObservableBase : INotifyPropertyChanged
+{
+    private readonly ConcurrentDictionary<string, object> _values = new();
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    protected bool SetProperty<T>(T value, [CallerMemberName] string? name = null)
+    {
+        if (name == null) return false;
+        var old = _values.GetOrAdd(name, default(T)!);
+        if (!EqualityComparer<T>.Default.Equals((T)old, value))
         {
-            public const int BufferSize = 32;
-            public const int MaxTtl = 12;
-            public const int Timeout = 5000;
-            public const int ParallelRequests = 1;
-            public const int BaseDelay = 1000;
-            public const int MinDelay = 100;
-            public const double HighLossThreshold = 50;
-            public const double LowLossThreshold = 10;
+            _values[name] = value!;
+            OnPropertyChanged(name);
+            return true;
+        }
+        return false;
+    }
+    protected T GetProperty<T>(T defaultValue = default!, [CallerMemberName] string? name = null) =>
+        name == null ? defaultValue : (T)_values.GetOrAdd(name, defaultValue!);
+}
+
+public abstract class ValidationBase
+{
+    protected static void ValidateNotNull<T>(T value, string paramName) where T : class =>
+        _ = value ?? throw new ArgumentNullException(paramName);
+    protected static void ValidateNotNullOrEmpty(string value, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException($"{paramName} не может быть пустым.", paramName);
+    }
+}
+
+public class TraceResult : ObservableBase
+{
+    public int Nr { get => GetProperty(0); set => SetProperty(value); }
+    public string IPAddress { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string DomainName { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string Loss { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string Sent { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string Received { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string Best { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string Avrg { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string Wrst { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+    public string Last { get => GetProperty(string.Empty); set => SetProperty(value ?? string.Empty); }
+
+    public TraceResult(int ttl, string ipAddress, string domainName, HopData hop)
+    {
+        if (hop == null) throw new ArgumentNullException(nameof(hop));
+        Nr = ttl;
+        IPAddress = ipAddress;
+        DomainName = domainName;
+        UpdateStatistics(hop);
+    }
+
+    public void UpdateStatistics(HopData hop)
+    {
+        if (hop == null) throw new ArgumentNullException(nameof(hop));
+        var stats = hop.GetStatistics();
+        SetProperty(hop.Sent.ToString(), nameof(Sent));
+        SetProperty(hop.Received.ToString(), nameof(Received));
+        SetProperty($"{stats.LossPercentage.ToString(Constants.DefaultFormat)}{Constants.PercentageSuffix}", nameof(Loss));
+        SetProperty(FormatMs(stats.Min), nameof(Best));
+        SetProperty(FormatMs(stats.Max), nameof(Wrst));
+        SetProperty(FormatMs((long)stats.Avg), nameof(Avrg));
+        SetProperty(FormatMs(stats.Last), nameof(Last));
+    }
+
+    private static string FormatMs(long ms) => $"{ms}{Constants.MsUnitSuffix}";
+
+    // Переопределение метода ToString для вывода нужной информации
+    public override string ToString() =>
+        $"TTL: {Nr}, IP: {IPAddress}, Domain: {DomainName}, Loss: {Loss}, Sent: {Sent}, Received: {Received}, " +
+        $"Best: {Best}, Avg: {Avrg}, Worst: {Wrst}, Last: {Last}";
+}
+
+public sealed class HopData
+{
+    private readonly ConcurrentQueue<long> _times = new();
+    private readonly object _lock = new();
+    private long _last;
+    private (long Min, long Max, double Avg, long Last, double LossPercentage) _cached;
+    private volatile bool _needUpdate = true;
+    public int Sent { get; set; }
+    public int Received { get; set; }
+    public void AddResponseTime(long time)
+    {
+        if (time < 0) throw new ArgumentOutOfRangeException(nameof(time));
+        _times.Enqueue(time);
+        Interlocked.Exchange(ref _last, time);
+        _needUpdate = true;
+    }
+    public double CalculateLossPercentage() => Sent == 0 ? 0 : (double)(Sent - Received) / Sent * 100;
+    public (long Min, long Max, double Avg, long Last, double LossPercentage) GetStatistics()
+    {
+        if (_times.IsEmpty) return (0, 0, 0, 0, 0);
+        if (!_needUpdate) return _cached;
+        lock (_lock)
+        {
+            if (!_needUpdate) return _cached;
+            var arr = _times.ToArray();
+            _cached = (arr.Min(), arr.Max(), arr.Average(), _last, CalculateLossPercentage());
+            _needUpdate = false;
+            return _cached;
         }
     }
-
-    // -------------------- Interfaces --------------------
-    public interface IDnsManager
+    public void Clear()
     {
-        Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token);
-    }
-
-    public interface IPingManager
-    {
-        Task StartTraceAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback);
-        void ClearHopData();
-    }
-
-    public interface ITraceWindow
-    {
-        bool IsLoaded { get; }
-        bool IsVisible { get; }
-        Visibility Visibility { get; set; }
-        void Show();
-        void Close();
-        event EventHandler Closed;
-    }
-
-    // -------------------- Models --------------------
-    public abstract class ObservableBase : INotifyPropertyChanged
-    {
-        private readonly ConcurrentDictionary<string, object> _propertyValues = new();
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-
-        protected bool SetProperty<T>(T value, [CallerMemberName] string? propertyName = null)
+        lock (_lock)
         {
-            if (propertyName == null) return false;
+            while (_times.TryDequeue(out _)) { }
+            _last = 0;
+            _needUpdate = true;
+            _cached = default;
+            Sent = Received = 0;
+        }
+    }
+}
 
-            var oldValue = _propertyValues.GetOrAdd(propertyName, default(T)!);
-            if (!EqualityComparer<T>.Default.Equals((T)oldValue, value))
+public class DnsManager : ValidationBase, IDnsManager
+{
+    private readonly IMemoryCache _cache;
+    private readonly TimeSpan _dnsTimeout;
+    private readonly MemoryCacheEntryOptions _cacheOptions;
+    public DnsManager(IMemoryCache memoryCache, TimeSpan? dnsTimeout = null)
+    {
+        ValidateNotNull(memoryCache, nameof(memoryCache));
+        _cache = memoryCache;
+        _dnsTimeout = dnsTimeout ?? TimeSpan.FromSeconds(5);
+        _cacheOptions = new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(TimeSpan.FromMinutes(30))
+            .SetSlidingExpiration(TimeSpan.FromMinutes(10));
+    }
+    public async Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token)
+    {
+        ValidateNotNullOrEmpty(ipAddress, nameof(ipAddress));
+        if (!IPAddress.TryParse(ipAddress, out var parsed))
+            throw new ArgumentException("Некорректный IP-адрес", nameof(ipAddress));
+        if (_cache.TryGetValue(ipAddress, out string? cached))
+            return cached ?? Constants.DefaultUnresolvedValue;
+        return await ResolveAsync(ipAddress, parsed, token);
+    }
+    private async Task<string> ResolveAsync(string ipAddress, IPAddress parsed, CancellationToken token)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            cts.CancelAfter(_dnsTimeout);
+            var entry = await Dns.GetHostEntryAsync(parsed);
+            string result = entry.HostName;
+            _cache.Set(ipAddress, result, _cacheOptions);
+            return result;
+        }
+        catch (Exception)
+        {
+            _cache.Set(ipAddress, Constants.DefaultUnresolvedValue, _cacheOptions);
+            return Constants.DefaultUnresolvedValue;
+        }
+    }
+}
+
+public class PingManager : ValidationBase, IPingManager
+{
+    private readonly IDnsManager _dnsManager;
+    private readonly ConcurrentDictionary<string, HopData> _hops = new();
+    private readonly byte[] _buffer = new byte[Constants.Ping.BufferSize];
+    public PingManager(IDnsManager dnsManager)
+    {
+        ValidateNotNull(dnsManager, nameof(dnsManager));
+        _dnsManager = dnsManager;
+    }
+    public async Task StartTraceAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback)
+    {
+        ValidateNotNullOrEmpty(host, nameof(host));
+        ValidateNotNull(updateUiCallback, nameof(updateUiCallback));
+        while (!token.IsCancellationRequested)
+        {
+            var (maxTtl, delay) = GetParameters();
+            await ExecuteRoundAsync(host, maxTtl, updateUiCallback, token);
+            await Task.Delay(delay, token);
+        }
+    }
+    public void ClearHopData() => _hops.Clear();
+    private (int MaxTtl, int Delay) GetParameters()
+    {
+        var stats = (_hops.Values.Sum(h => h.Sent), _hops.Values.Sum(h => h.Received));
+        double loss = stats.Item1 > 0 ? (stats.Item1 - stats.Item2) / (double)stats.Item1 * 100 : 0;
+        int delay = loss switch
+        {
+            > Constants.Ping.HighLossThreshold => Math.Min(Constants.Ping.Timeout, (int)(Constants.Ping.BaseDelay * 1.5)),
+            < Constants.Ping.LowLossThreshold => Math.Max(Constants.Ping.MinDelay, (int)(Constants.Ping.BaseDelay * 0.75)),
+            _ => Constants.Ping.BaseDelay
+        };
+        return (Constants.Ping.MaxTtl, delay);
+    }
+    private async Task ExecuteRoundAsync(string host, int maxTtl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+    {
+        var tasks = Enumerable.Range(1, maxTtl)
+            .Select(ttl => ExecuteForTtlAsync(host, ttl, updateUiCallback, token));
+        await Task.WhenAll(tasks);
+    }
+    private async Task ExecuteForTtlAsync(string host, int ttl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+    {
+        var tasks = Enumerable.Range(0, Constants.Ping.ParallelRequests)
+            .Select(_ => ExecuteSingleAsync(host, ttl, updateUiCallback, token));
+        await Task.WhenAll(tasks);
+    }
+    private async Task ExecuteSingleAsync(string host, int ttl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+    {
+        using var ping = new Ping();
+        try
+        {
+            var (reply, elapsed) = await SendAsync(ping, host, ttl, token);
+            if (reply != null)
+                await ProcessReplyAsync(reply, ttl, elapsed, updateUiCallback, token);
+        }
+        catch (PingException) { }
+        catch (Exception ex) when (!(ex is OperationCanceledException)) { }
+    }
+    private async Task<(PingReply? Reply, long Elapsed)> SendAsync(Ping ping, string host, int ttl, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var reply = await ping.SendPingAsync(host, Constants.Ping.Timeout, _buffer, new PingOptions { Ttl = ttl });
+        sw.Stop();
+        return (reply, sw.ElapsedMilliseconds);
+    }
+    private async Task ProcessReplyAsync(PingReply reply, int ttl, long elapsed, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
+    {
+        var ip = reply.Address?.ToString() ?? "Неизвестный адрес";
+        if (string.IsNullOrWhiteSpace(ip) || ip.Trim() == "0.0.0.0") return;
+        var hop = _hops.GetOrAdd(ip, _ => new HopData());
+        lock (hop)
+        {
+            hop.Sent++;
+            if (reply.Status is IPStatus.Success or IPStatus.TtlExpired or IPStatus.TimeExceeded)
             {
-                _propertyValues[propertyName] = value!;
-                OnPropertyChanged(propertyName);
-                return true;
+                hop.Received++;
+                hop.AddResponseTime(elapsed);
             }
+        }
+        string domain;
+        try { domain = await _dnsManager.GetDomainNameAsync(ip, token); }
+        catch (OperationCanceledException) { domain = ip; }
+        catch { domain = ip; }
+        updateUiCallback(ip, ttl, domain, hop);
+    }
+}
+
+public class TraceManager : ValidationBase, IDisposable
+{
+    private CancellationTokenSource? _cts;
+    private bool _disposed;
+    private readonly IPingManager _pingManager;
+    private readonly IDnsManager _dnsManager;
+    private readonly ObservableCollection<TraceResult> _results;
+    private readonly IMemoryCache _memoryCache;
+    private bool _isTracing;
+    public ObservableCollection<TraceResult> TraceResults => _results;
+    public string TraceUrl { get; }
+    public bool IsTracing { get => _isTracing; private set => _isTracing = value; }
+    public TraceManager(string url)
+    {
+        ValidateNotNullOrEmpty(url, nameof(url));
+        TraceUrl = url;
+        _results = new ObservableCollection<TraceResult>();
+        _memoryCache = new MemoryCache(new MemoryCacheOptions());
+        _dnsManager = new DnsManager(_memoryCache);
+        _pingManager = new PingManager(_dnsManager);
+    }
+    public async Task StartTraceAsync(Action<string, Color> updateStatus, Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
+    {
+        if (IsTracing)
+        {
+            showMessage("Трассировка уже запущена.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        IsTracing = true;
+        updateStatus("Трассировка запущена...", Colors.Green);
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        try { await _pingManager.StartTraceAsync(TraceUrl, _cts.Token, UpdateResult); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { showMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error); }
+        finally { IsTracing = false; updateStatus("Трассировка остановлена.", Colors.Red); }
+    }
+    public void StopTrace() { try { _cts?.Cancel(); } catch { } }
+    public void ClearResults() { _results.Clear(); _pingManager.ClearHopData(); }
+    private void UpdateResult(string ip, int ttl, string domain, HopData hop)
+    {
+        if (string.IsNullOrWhiteSpace(ip)) return;
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var existing = _results.FirstOrDefault(r => r.IPAddress == ip);
+            if (existing is null)
+                _results.Add(new TraceResult(ttl, ip, domain, hop));
+            else
+                existing.UpdateStatistics(hop);
+        });
+    }
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+        if (disposing) { _cts?.Dispose(); _memoryCache.Dispose(); }
+        _disposed = true;
+    }
+    ~TraceManager() => Dispose(false);
+}
+
+public partial class TraceWindow : Window, ITraceWindow
+{
+    private readonly TraceManager _traceManager;
+    public ICollectionView TraceResults { get; }
+    public TraceWindow(string url)
+    {
+        InitializeComponent();
+        _traceManager = new TraceManager(url);
+        TraceResults = CollectionViewSource.GetDefaultView(_traceManager.TraceResults);
+        ResultsList.ItemsSource = TraceResults;
+        ((CollectionView)TraceResults).SortDescriptions.Add(new SortDescription("Nr", ListSortDirection.Ascending));
+    }
+    private async void BtnStartTrace_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ValidateStart()) return;
+        SetControlsState(true);
+        await _traceManager.StartTraceAsync(UpdateStatus, ShowMessage);
+    }
+    private bool ValidateStart()
+    {
+        if (_traceManager.IsTracing)
+        {
+            ShowMessage("Трассировка уже запущена.", "Предупреждение");
             return false;
         }
-
-        protected T GetProperty<T>(T defaultValue = default!, [CallerMemberName] string? propertyName = null) =>
-            propertyName == null ? defaultValue :
-            (T)_propertyValues.GetOrAdd(propertyName, defaultValue!);
-    }
-
-    public abstract class ValidationBase
-    {
-        protected static void ValidateNotNull<T>(T value, string paramName, ILoggingService logger) where T : class
+        if (string.IsNullOrWhiteSpace(_traceManager.TraceUrl))
         {
-            if (value == null)
-            {
-                logger.Error($"[{typeof(T).Name}] {paramName} не может быть null.");
-                throw new ArgumentNullException(paramName);
-            }
+            ShowMessage("Пожалуйста, укажите URL для трассировки.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
-
-        protected static void ValidateNotNullOrEmpty(string value, string paramName, ILoggingService logger)
+        return true;
+    }
+    private void SaveResults(string fileName)
+    {
+        try
         {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                logger.Error($"[{typeof(ValidationBase).Name}] {paramName} не может быть пустым.");
-                throw new ArgumentException($"{paramName} не может быть пустым.", paramName);
-            }
+            System.IO.File.WriteAllLines(fileName, _traceManager.TraceResults.Select(r => r?.ToString() ?? "Пустой результат"));
+            ShowMessage("Результаты успешно сохранены.", "Успех");
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"Ошибка при сохранении результатов: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
-
-    public class TraceResult : ObservableBase
+    private void ShowMessage(string msg, string title, MessageBoxButton btn = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.Information) =>
+        MessageBox.Show(msg, title, btn, icon);
+    private void UpdateStatus(string msg, Color color) =>
+        StatusTextBlock.Dispatcher.Invoke(() =>
+        {
+            StatusTextBlock.Text = msg;
+            StatusTextBlock.Foreground = new SolidColorBrush(color);
+        });
+    private void BtnClearResults_Click(object sender, RoutedEventArgs e) => _traceManager.ClearResults();
+    private void BtnStopTrace_Click(object sender, RoutedEventArgs e)
     {
-
-        private readonly ILoggingService _logger;
-
-        public int Nr
-        {
-            get => GetProperty(0);
-            set => SetProperty(value);
-        }
-
-        public string IPAddress
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string DomainName
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string Loss
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string Sent
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string Received
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string Best
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string Avrg
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string Wrst
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public string Last
-        {
-            get => GetProperty(string.Empty);
-            set => SetProperty(value ?? string.Empty);
-        }
-
-        public TraceResult(ILoggingService logger, int ttl, string ipAddress, string domainName, HopData hop)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-            if (hop == null)
-            {
-                _logger.Error("[TraceResult] HopData не может быть null.");
-                throw new ArgumentNullException(nameof(hop));
-            }
-
-            Nr = ttl;
-            IPAddress = ipAddress;
-            DomainName = domainName;
-            UpdateStatistics(hop);
-            _logger.Information($"[TraceResult] Обновлена статистика для IP: {ipAddress}");
-        }
-
-        public void UpdateStatistics(HopData hop)
-        {
-            if (hop == null)
-            {
-                _logger.Error("[TraceResult] HopData не может быть null.");
-                throw new ArgumentNullException(nameof(hop));
-            }
-
-            _logger.Information($"[TraceResult] Обновление статистики для {DomainName}.");
-            var stats = hop.GetStatistics();
-            UpdateStatisticsValues(
-                hop.Sent,
-                hop.Received,
-                hop.CalculateLossPercentage(),
-                stats.Min,
-                stats.Max,
-                stats.Avg,
-                stats.Last
-            );
-        }
-
-        private void UpdateStatisticsValues(
-            int sent, int received, double lossPercentage,
-            long bestTime, long worstTime, double averageTime, long lastTime)
-        {
-            _logger.Information($"[TraceResult] Обновление значений статистики: Sent={sent}, Received={received}.");
-            SetProperty(sent.ToString(), nameof(Sent));
-            SetProperty(received.ToString(), nameof(Received));
-            SetProperty($"{lossPercentage.ToString(Constants.DefaultFormat)}{Constants.PercentageSuffix}", nameof(Loss));
-            SetProperty(FormatMilliseconds(bestTime), nameof(Best));
-            SetProperty(FormatMilliseconds(worstTime), nameof(Wrst));
-            SetProperty(FormatMilliseconds((long)averageTime), nameof(Avrg));
-            SetProperty(FormatMilliseconds(lastTime), nameof(Last));
-        }
-
-        private static string FormatMilliseconds(long milliseconds) =>
-            $"{milliseconds}{Constants.MsUnitSuffix}";
+        _traceManager.StopTrace();
+        UpdateStatus("Остановка трассировки...", Colors.Orange);
+        SetControlsState(false);
     }
-
-    public sealed class HopData
+    private void SetControlsState(bool tracing)
     {
-        private readonly ConcurrentQueue<long> _responseTimes = new();
-        private readonly ILoggingService _logger;
-        private readonly object _statsLock = new();
-
-        private volatile int _sent;
-        private volatile int _received;
-        private long _lastResponseTime;
-        private (long Min, long Max, double Avg, long Last) _cachedStats;
-        private volatile bool _statsNeedUpdate = true;
-
-        public HopData(ILoggingService logger) =>
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        public int Sent
-        {
-            get => _sent;
-            set => Interlocked.Exchange(ref _sent, value);
-        }
-
-        public int Received
-        {
-            get => _received;
-            set => Interlocked.Exchange(ref _received, value);
-        }
-
-        public void AddResponseTime(long time)
-        {
-            if (time < 0)
-            {
-                _logger.Error("[HopData] Отрицательное время отклика");
-                throw new ArgumentOutOfRangeException(nameof(time));
-            }
-
-            _responseTimes.Enqueue(time);
-            Interlocked.Exchange(ref _lastResponseTime, time);
-            _statsNeedUpdate = true;
-        }
-
-        public double CalculateLossPercentage() =>
-            Sent == 0 ? 0 : (double)(Sent - Received) / Sent * 100;
-
-        public (long Min, long Max, double Avg, long Last) GetStatistics()
-        {
-            if (_responseTimes.IsEmpty)
-                return (0, 0, 0, 0);
-
-            if (!_statsNeedUpdate)
-                return _cachedStats;
-
-            lock (_statsLock)
-            {
-                if (!_statsNeedUpdate)
-                    return _cachedStats;
-
-                var times = _responseTimes.ToArray();
-                if (times.Length == 0)
-                    return (0, 0, 0, 0);
-
-                _cachedStats = (
-                    times.Min(),
-                    times.Max(),
-                    times.Average(),
-                    _lastResponseTime
-                );
-                _statsNeedUpdate = false;
-                return _cachedStats;
-            }
-        }
-
-        public void Clear()
-        {
-            lock (_statsLock)
-            {
-                while (_responseTimes.TryDequeue(out _)) { }
-                _lastResponseTime = 0;
-                _statsNeedUpdate = true;
-                _cachedStats = default;
-                Sent = Received = 0;
-            }
-        }
+        btnStartTrace.IsEnabled = !tracing;
+        btnStopTrace.IsEnabled = tracing;
     }
-
-    // -------------------- Implementations --------------------
-    public class DnsManager : ValidationBase, IDnsManager
+    private void BtnSaveResults_Click(object sender, RoutedEventArgs e)
     {
-        private readonly IMemoryCache _dnsCache;
-        private readonly TimeSpan _dnsTimeout;
-        private readonly MemoryCacheEntryOptions _cacheOptions;
-        private readonly ILoggingService _logger;
-
-        public DnsManager(IMemoryCache memoryCache, ILoggingService logger, TimeSpan? dnsTimeout = null)
-        {
-            ValidateNotNull(memoryCache, nameof(memoryCache), logger);
-            ValidateNotNull(logger, nameof(logger), logger);
-
-            _dnsCache = memoryCache;
-            _logger = logger;
-            _dnsTimeout = dnsTimeout ?? TimeSpan.FromSeconds(5);
-            _cacheOptions = new MemoryCacheEntryOptions()
-                .SetAbsoluteExpiration(TimeSpan.FromMinutes(30))
-                .SetSlidingExpiration(TimeSpan.FromMinutes(10));
-        }
-
-        public async Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token)
-        {
-            ValidateNotNullOrEmpty(ipAddress, nameof(ipAddress), _logger);
-
-            if (!IPAddress.TryParse(ipAddress, out var parsedIp))
-            {
-                _logger.Error($"[DnsManager] Некорректный IP-адрес: {ipAddress}");
-                throw new ArgumentException("Некорректный IP-адрес", nameof(ipAddress));
-            }
-
-            // Попробуем найти результат в кэше
-            if (_dnsCache.TryGetValue(ipAddress, out string? cachedResult))
-            {
-                _logger.Information($"[DnsManager] Кэш найден для {ipAddress}: {cachedResult}");
-                return cachedResult ?? Constants.DefaultUnresolvedValue;
-            }
-
-            // Если не найдено, попытаться разрешить имя
-            return await ResolveDomainNameAsync(ipAddress, parsedIp, token);
-        }
-
-        private async Task<string> ResolveDomainNameAsync(string ipAddress, IPAddress parsedIp, CancellationToken token)
-        {
-            try
-            {
-                using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                cts.CancelAfter(_dnsTimeout);
-
-                var hostEntry = await Dns.GetHostEntryAsync(parsedIp);
-                string result = hostEntry.HostName;
-
-                // Сохранение результата в кэше
-                _dnsCache.Set(ipAddress, result, _cacheOptions);
-                _logger.Information($"[DnsManager] DNS-имя для {ipAddress}: {result}");
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logger.Warning($"[DnsManager] Ошибка при разрешении DNS для {ipAddress}: {ex.Message}");
-                _dnsCache.Set(ipAddress, Constants.DefaultUnresolvedValue, _cacheOptions);
-                return Constants.DefaultUnresolvedValue;
-            }
-        }
-    }
-
-    public class PingManager : ValidationBase, IPingManager
-    {
-        private readonly IDnsManager _dnsManager;
-        private readonly ConcurrentDictionary<string, HopData> _hopData;
-        private readonly byte[] _buffer;
-        private readonly ILoggingService _logger;
-
-        public PingManager(IDnsManager dnsManager, ILoggingService logger)
-        {
-            ValidateNotNull(dnsManager, nameof(dnsManager), logger);
-            ValidateNotNull(logger, nameof(logger), logger);
-
-            _dnsManager = dnsManager;
-            _logger = logger;
-            _hopData = new ConcurrentDictionary<string, HopData>();
-            _buffer = new byte[Constants.Ping.BufferSize];
-        }
-
-        public async Task StartTraceAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback)
-        {
-            ValidateNotNullOrEmpty(host, nameof(host), _logger);
-            ValidateNotNull(updateUiCallback, nameof(updateUiCallback), _logger);
-
-            try
-            {
-                await ExecuteTracingLoopAsync(host, token, updateUiCallback);
-            }
-            finally
-            {
-                _logger.Information($"[PingManager] Завершение трассировки для хоста: {host}");
-            }
-        }
-
-        public void ClearHopData()
-        {
-            _hopData.Clear();
-            _logger.Information("[PingManager] Очищена статистика по хопам");
-        }
-
-        private async Task ExecuteTracingLoopAsync(string host, CancellationToken token, Action<string, int, string, HopData> updateUiCallback)
-        {
-            while (!token.IsCancellationRequested)
-            {
-                var (maxTtl, delay) = GetTraceParameters();
-                await ExecuteTraceRoundAsync(host, maxTtl, updateUiCallback, token);
-                await Task.Delay(delay, token);
-            }
-        }
-
-        private (int MaxTtl, int Delay) GetTraceParameters()
-        {
-            var stats = CalculateLossStatistics();
-            return (Constants.Ping.MaxTtl, CalculateAdaptiveDelay(stats));
-        }
-
-        private (int TotalSent, int TotalReceived, double LossPercentage) CalculateLossStatistics()
-        {
-            int totalSent = _hopData.Values.Sum(h => h.Sent);
-            int totalReceived = _hopData.Values.Sum(h => h.Received);
-            double lossPercentage = totalSent > 0 ? (totalSent - totalReceived) / (double)totalSent * 100 : 0;
-            return (totalSent, totalReceived, lossPercentage);
-        }
-
-        private int CalculateAdaptiveDelay((int TotalSent, int TotalReceived, double LossPercentage) stats)
-        {
-            return stats.LossPercentage switch
-            {
-                > Constants.Ping.HighLossThreshold => Math.Min(Constants.Ping.Timeout, (int)(Constants.Ping.BaseDelay * 1.5)),
-                < Constants.Ping.LowLossThreshold => Math.Max(Constants.Ping.MinDelay, (int)(Constants.Ping.BaseDelay * 0.75)),
-                _ => Constants.Ping.BaseDelay
-            };
-        }
-
-        private async Task ExecuteTraceRoundAsync(
-            string host, int maxTtl,
-            Action<string, int, string,
-            HopData> updateUiCallback,
-            CancellationToken token)
-        {
-            var pingTasks = Enumerable.Range(1, maxTtl)
-                .Select(ttl => ExecutePingForTtlAsync(host, ttl, updateUiCallback, token));
-            await Task.WhenAll(pingTasks);
-        }
-
-        private async Task ExecutePingForTtlAsync(
-            string host, int ttl,
-            Action<string, int, string,
-            HopData> updateUiCallback,
-            CancellationToken token)
-        {
-            var pingTasks = Enumerable.Range(0, Constants.Ping.ParallelRequests)
-                .Select(_ => ExecuteSinglePingAsync(host, ttl, updateUiCallback, token));
-            await Task.WhenAll(pingTasks);
-        }
-
-        private async Task ExecuteSinglePingAsync(
-            string host, int ttl,
-            Action<string, int, string,
-            HopData> updateUiCallback,
-            CancellationToken token)
-        {
-            using var pingSender = new Ping();
-            try
-            {
-                var (reply, responseTime) = await SendPingAsync(pingSender, host, ttl, token);
-                if (reply != null)
-                {
-                    await ProcessPingReplyAsync(reply, ttl, responseTime, updateUiCallback, token);
-                }
-            }
-            catch (PingException ex)
-            {
-                _logger.Warning($"[PingManager] Ошибка пинга {host} с TTL {ttl}: {ex.Message}");
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.Error(ex, $"[PingManager] Непредвиденная ошибка: {ex.Message}");
-            }
-        }
-
-        private async Task<(PingReply? Reply, long ResponseTime)> SendPingAsync(Ping pingSender, string host, int ttl, CancellationToken token)
-        {
-            token.ThrowIfCancellationRequested();
-
-            var stopwatch = Stopwatch.StartNew();
-            var reply = await pingSender.SendPingAsync(host, Constants.Ping.Timeout, _buffer, new PingOptions { Ttl = ttl });
-            stopwatch.Stop();
-
-            return (reply, stopwatch.ElapsedMilliseconds);
-        }
-
-        private async Task ProcessPingReplyAsync(
-            PingReply reply,
-            int ttl, long responseTime,
-            Action<string, int, string,
-            HopData> updateUiCallback,
-            CancellationToken token)
-        {
-            var ipAddress = reply.Address?.ToString() ?? "Неизвестный адрес";
-            if (!IsValidIpAddress(ipAddress)) return;
-
-            var hop = _hopData.GetOrAdd(ipAddress, key => new HopData(_logger));
-
-            UpdateHopStatistics(hop, reply, responseTime);
-
-            try
-            {
-                var domainName = await _dnsManager.GetDomainNameAsync(ipAddress, token);
-                updateUiCallback(ipAddress, ttl, domainName, hop);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.Warning($"[PingManager] Запрос доменного имени для {ipAddress} отменен.");
-                updateUiCallback(ipAddress, ttl, ipAddress, hop);
-            }
-            catch (Exception ex)
-            {
-                _logger.Warning($"[PingManager] Не удалось получить доменное имя для {ipAddress}; используется IP. {ex.Message}");
-                updateUiCallback(ipAddress, ttl, ipAddress, hop);
-            }
-        }
-
-        private static bool IsValidIpAddress(string ipAddress)
-            => !string.IsNullOrEmpty(ipAddress) && ipAddress.Trim() != "0.0.0.0";
-
-        private static void UpdateHopStatistics(HopData hop, PingReply reply, long responseTime)
-        {
-            lock (hop) // минимизация гонок
-            {
-                hop.Sent++;
-                if (reply.Status is IPStatus.Success or IPStatus.TtlExpired or IPStatus.TimeExceeded)
-                {
-                    hop.Received++;
-                    hop.AddResponseTime(responseTime);
-                }
-            }
-        }
-    }
-
-    public class TraceManager : ValidationBase, IDisposable
-    {
-        private CancellationTokenSource? _cts;
-        private bool _disposed;
-        private readonly IPingManager _pingManager;
-        private readonly IDnsManager _dnsManager;
-        private readonly ILoggingService _logger;
-        private readonly ObservableCollection<TraceResult> _traceResults;
-        private readonly IMemoryCache _memoryCache;
-        private bool _isTracing;
-
-        public ObservableCollection<TraceResult> TraceResults => _traceResults;
-        public string TraceUrl { get; }
-        public bool IsTracing
-        {
-            get => _isTracing;
-            private set => _isTracing = value;
-        }
-
-        public TraceManager(string url, ILoggingService logger)
-        {
-            ValidateNotNullOrEmpty(url, nameof(url), logger);
-            ValidateNotNull(logger, nameof(logger), logger);
-
-            TraceUrl = url;
-            _logger = logger;
-            _traceResults = new ObservableCollection<TraceResult>();
-
-            _memoryCache = new MemoryCache(new MemoryCacheOptions());
-            _dnsManager = new DnsManager(_memoryCache, logger);
-            _pingManager = new PingManager(_dnsManager, logger);
-
-            _logger.Information($"[TraceManager] Инициализирован с URL: {url}");
-        }
-
-        public async Task StartTraceAsync(Action<string, Color> updateStatus, Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
-        {
-            if (!ValidateTraceStart(showMessage)) return;
-
-            IsTracing = true;
-            updateStatus("Трассировка запущена...", Colors.Green);
-            _logger.Information($"[TraceManager] Запуск трассировки для URL: {TraceUrl}");
-
-            _cts?.Dispose();
-            _cts = new CancellationTokenSource();
-
-            try
-            {
-                await _pingManager.StartTraceAsync(TraceUrl, _cts.Token, UpdateHopStatistics);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.Warning("[TraceManager] Трассировка отменена");
-            }
-            catch (Exception ex)
-            {
-                HandleTraceError(ex, showMessage);
-            }
-            finally
-            {
-                ResetTraceStatus(updateStatus);
-            }
-        }
-
-        private bool ValidateTraceStart(Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
-        {
-            if (IsTracing)
-            {
-                showMessage("Трассировка уже запущена.", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
-                _logger.Warning("[TraceManager] Попытка запустить уже запущенную трассировку");
-                return false;
-            }
-            return true;
-        }
-
-        private void HandleTraceError(Exception ex, Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
-        {
-            _logger.Error(ex, $"[TraceManager] Ошибка: {ex.Message}");
-            showMessage($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-
-        public void StopTrace()
-        {
-            try
-            {
-                _cts?.Cancel();
-                _logger.Information("[TraceManager] Трассировка остановлена");
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "[TraceManager] Ошибка при остановке трассировки");
-            }
-        }
-
-        public void ClearResults()
-        {
-            _traceResults.Clear();
-            _pingManager.ClearHopData();
-            _logger.Information("[TraceManager] Результаты очищены");
-        }
-
-        private void UpdateHopStatistics(string ipAddress, int ttl, string domainName, HopData hop)
-        {
-            if (string.IsNullOrEmpty(ipAddress))
-            {
-                _logger.Warning("[TraceManager] Получен пустой IP-адрес");
-                return;
-            }
-
-            try
-            {
-                Application.Current.Dispatcher.Invoke(() =>
-                {
-                    var existingResult = _traceResults.FirstOrDefault(tr => tr.IPAddress == ipAddress);
-
-                    if (existingResult is null)
-                    {
-                        _traceResults.Add(new TraceResult(_logger, ttl, ipAddress, domainName, hop));
-                        _logger.Information($"[TraceManager] Добавлен новый результат для IP: {ipAddress}");
-                    }
-                    else
-                    {
-                        existingResult.UpdateStatistics(hop);
-                        _logger.Information($"[TraceManager] Обновлена статистика для IP: {ipAddress}");
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "[TraceManager] Ошибка при обновлении статистики хопа");
-            }
-        }
-
-        private void ResetTraceStatus(Action<string, Color> updateStatus)
-        {
-            IsTracing = false;
-            updateStatus("Трассировка остановлена.", Colors.Red);
-            _logger.Information("[TraceManager] Статус трассировки сброшен");
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed) return;
-
-            if (disposing)
-            {
-                _cts?.Dispose();
-                _memoryCache?.Dispose();
-            }
-
-            _disposed = true;
-        }
-
-        ~TraceManager()
-        {
-            Dispose(false);
-        }
-    }
-
-    public partial class TraceWindow : Window, ITraceWindow
-    {
-        private readonly TraceManager _traceManager;
-        private readonly ILoggingService _logger;
-
-        public ICollectionView TraceResults { get; }
-
-        public TraceWindow(string url, ILoggingService logger)
-        {
-            InitializeComponent();
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _traceManager = new TraceManager(url, _logger);
-
-            TraceResults = ConfigureTraceResults();
-            _logger.Information($"[TraceWindow] Инициализирован с URL: {url}");
-        }
-
-        private ICollectionView ConfigureTraceResults()
-        {
-            var view = CollectionViewSource.GetDefaultView(_traceManager.TraceResults);
-            ResultsList.ItemsSource = view;
-            ((CollectionView)view).SortDescriptions.Add(new SortDescription("Nr", ListSortDirection.Ascending));
-            return view;
-        }
-
-        private async void BtnStartTrace_Click(object sender, RoutedEventArgs e)
-        {
-            await HandleTraceStartAsync();
-        }
-
-        private async Task HandleTraceStartAsync()
-        {
-            if (!ValidateTraceStart()) return;
-
-            SetTraceControlsState(isStarting: true);
-            await _traceManager.StartTraceAsync(UpdateStatus, ShowMessage);
-        }
-
-        private bool ValidateTraceStart()
-        {
-            if (_traceManager.IsTracing)
-            {
-                ShowMessage("Трассировка уже запущена.", "Предупреждение");
-                _logger.Warning("[TraceWindow] Попытка запустить уже запущенную трассировку");
-                return false;
-            }
-
-            if (string.IsNullOrWhiteSpace(_traceManager.TraceUrl))
-            {
-                ShowMessage("Пожалуйста, укажите URL для трассировки.", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
-                _logger.Error("[TraceWindow] URL для трассировки не указан");
-                return false;
-            }
-
-            return true;
-        }
-
-        private void SaveResults(string fileName)
-        {
-            try
-            {
-                File.WriteAllLines(fileName, _traceManager.TraceResults.Select(result => result?.ToString() ?? "Пустой результат"));
-                ShowMessage("Результаты успешно сохранены.", "Успех");
-                _logger.Information($"[TraceWindow] Результаты сохранены в файл: {fileName}");
-            }
-            catch (Exception ex)
-            {
-                ShowMessage($"Ошибка при сохранении результатов: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
-                _logger.Error(ex, $"[TraceWindow] Ошибка при сохранении результатов: {ex.Message}");
-            }
-        }
-
-        private void ShowMessage(string message, string title, MessageBoxButton button = MessageBoxButton.OK, MessageBoxImage icon = MessageBoxImage.Information)
-            => MessageBox.Show(message, title, button, icon);
-
-        private void UpdateStatus(string message, Color color)
-            => StatusTextBlock.Dispatcher.Invoke(() =>
-            {
-                StatusTextBlock.Text = message;
-                StatusTextBlock.Foreground = new SolidColorBrush(color);
-            });
-
-        private void BtnClearResults_Click(object sender, RoutedEventArgs e)
-        {
-            _traceManager.ClearResults();
-            _logger.Information("[TraceWindow] Результаты очищены");
-        }
-
-        private void BtnStopTrace_Click(object sender, RoutedEventArgs e)
-        {
-            _traceManager.StopTrace();
-            UpdateStatus("Остановка трассировки...", Colors.Orange);
-            _logger.Information("[TraceWindow] Трассировка остановлена");
-            SetTraceControlsState(isStarting: false);
-        }
-
-        private void SetTraceControlsState(bool isStarting)
-        {
-            btnStartTrace.IsEnabled = !isStarting;
-            btnStopTrace.IsEnabled = isStarting;
-        }
-
-        private void BtnSaveResults_Click(object sender, RoutedEventArgs e)
-        {
-            var saveFileDialog = new SaveFileDialog
-            {
-                Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
-            };
-
-            if (saveFileDialog.ShowDialog() == true)
-            {
-                SaveResults(saveFileDialog.FileName);
-            }
-        }
+        var dlg = new Microsoft.Win32.SaveFileDialog { Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*" };
+        if (dlg.ShowDialog() == true)
+            SaveResults(dlg.FileName);
     }
 }

@@ -49,7 +49,6 @@ namespace PingTestTool
     #region Implementations
     public partial class GraphWindow : Window, INotifyPropertyChanged, IDisposable, IGraphWindow
     {
-        private readonly ILoggingService _logger;
         private readonly IGraphManager _graphManager;
         private readonly IStatisticsManager _statisticsManager;
         private readonly DispatcherTimer _updateTimer;
@@ -74,11 +73,11 @@ namespace PingTestTool
             }
         }
 
-        public GraphWindow(int pingInterval, ILoggingService logger)
+        // Конструктор без зависимости от логирования.
+        public GraphWindow(int pingInterval)
         {
             InitializeComponent();
             DataContext = this;
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             PingPlotModel = new PlotModel
             {
                 Title = "График по времени отклика для Ping",
@@ -87,7 +86,6 @@ namespace PingTestTool
 
             _statisticsManager = new StatisticsManager();
             _graphManager = new GraphManager(
-                logger,
                 PingPlotModel,
                 UpdateTextFields,
                 _statisticsManager);
@@ -106,7 +104,6 @@ namespace PingTestTool
         {
             if (data is null || !data.Any())
             {
-                _logger.Warning("[GraphWindow] Пустые или нулевые данные получены для пинга.");
                 return;
             }
 
@@ -146,17 +143,16 @@ namespace PingTestTool
         private readonly ConcurrentDictionary<DateTime, double> _realtimeData = new();
         private readonly IStatisticsManager _statisticsManager;
         private readonly LineSeries _normalSeries;
-        private readonly ILoggingService _logger;
         private readonly object _lock = new();
         private bool _disposed;
         private int _maxVisiblePoints = Constant.MaxVisiblePoints;
 
-        public GraphManager(ILoggingService logger, PlotModel plotModel, Action<string, string, string, string> updateTextFields, IStatisticsManager statisticsManager)
+        // Конструктор без зависимости от логирования.
+        public GraphManager(PlotModel plotModel, Action<string, string, string, string> updateTextFields, IStatisticsManager statisticsManager)
         {
             _plotModel = plotModel;
             _updateTextFields = updateTextFields;
             _statisticsManager = statisticsManager ?? throw new ArgumentNullException(nameof(statisticsManager));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _normalSeries = new LineSeries
             {
@@ -212,7 +208,6 @@ namespace PingTestTool
         {
             if (_realtimeData.IsEmpty)
             {
-                _logger.Warning("[GraphManager] No data to update graph.");
                 return;
             }
 
@@ -223,7 +218,6 @@ namespace PingTestTool
 
             var dataValues = _realtimeData.Values.Select(d => (int)d).ToList();
             var stats = _statisticsManager.GetStatistics(dataValues);
-            _logger.Information($"[GraphManager] Min: {stats.Min}, Avg: {stats.Avg}, Max: {stats.Max}, Cur: {stats.Cur}");
             _updateTextFields(
                 $"{stats.Min:F1}",
                 $"{stats.Avg:F1}",
@@ -263,8 +257,6 @@ namespace PingTestTool
                     TrimDataToMaxVisiblePoints();
                 }
             }
-
-            _logger.Information("[GraphManager] Graph data updated. Current data count: {Count}", _realtimeData.Count);
         }
 
         public void Dispose()
@@ -283,7 +275,7 @@ namespace PingTestTool
 
     public class StatisticsManager : IStatisticsManager
     {
-        private ConcurrentQueue<int> _pingData = new();
+        private readonly ConcurrentQueue<int> _pingData = new();
         private int _maxDataPoints = Constant.MaxVisiblePoints;
         private bool _disposed;
 
