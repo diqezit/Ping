@@ -212,7 +212,6 @@
     <Compile Include="Service\CompileService.cs" />
     <Compile Include="Service\GlobalUsings.cs" />
     <Compile Include="Service\RelayCommand.cs" />
-    <Compile Include="MainWindow\PingService.cs" />
     <Compile Include="TraceWindow.xaml.cs">
       <DependentUpon>TraceWindow.xaml</DependentUpon>
     </Compile>

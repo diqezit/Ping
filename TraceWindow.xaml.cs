@@ -1,18 +1,4 @@
 ﻿#nullable enable
-using System;
-using System.Collections.Concurrent;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Linq;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Data;
-using System.Windows.Media;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace PingTestTool;
 
@@ -115,18 +101,17 @@ public class TraceResult : ObservableBase
     {
         if (hop == null) throw new ArgumentNullException(nameof(hop));
         var stats = hop.GetStatistics();
-        SetProperty(hop.Sent.ToString(), nameof(Sent));
-        SetProperty(hop.Received.ToString(), nameof(Received));
-        SetProperty($"{stats.LossPercentage.ToString(Constants.DefaultFormat)}{Constants.PercentageSuffix}", nameof(Loss));
-        SetProperty(FormatMs(stats.Min), nameof(Best));
-        SetProperty(FormatMs(stats.Max), nameof(Wrst));
-        SetProperty(FormatMs((long)stats.Avg), nameof(Avrg));
-        SetProperty(FormatMs(stats.Last), nameof(Last));
+        Sent = hop.Sent.ToString();
+        Received = hop.Received.ToString();
+        Loss = $"{stats.LossPercentage.ToString(Constants.DefaultFormat)}{Constants.PercentageSuffix}";
+        Best = FormatMs(stats.Min);
+        Wrst = FormatMs(stats.Max);
+        Avrg = FormatMs((long)stats.Avg);
+        Last = FormatMs(stats.Last);
     }
 
     private static string FormatMs(long ms) => $"{ms}{Constants.MsUnitSuffix}";
 
-    // Переопределение метода ToString для вывода нужной информации
     public override string ToString() =>
         $"TTL: {Nr}, IP: {IPAddress}, Domain: {DomainName}, Loss: {Loss}, Sent: {Sent}, Received: {Received}, " +
         $"Best: {Best}, Avg: {Avrg}, Worst: {Wrst}, Last: {Last}";
@@ -170,7 +155,8 @@ public sealed class HopData
             _last = 0;
             _needUpdate = true;
             _cached = default;
-            Sent = Received = 0;
+            Sent = 0;
+            Received = 0;
         }
     }
 }
@@ -241,8 +227,9 @@ public class PingManager : ValidationBase, IPingManager
     public void ClearHopData() => _hops.Clear();
     private (int MaxTtl, int Delay) GetParameters()
     {
-        var stats = (_hops.Values.Sum(h => h.Sent), _hops.Values.Sum(h => h.Received));
-        double loss = stats.Item1 > 0 ? (stats.Item1 - stats.Item2) / (double)stats.Item1 * 100 : 0;
+        int totalSent = _hops.Values.Sum(h => h.Sent);
+        int totalReceived = _hops.Values.Sum(h => h.Received);
+        double loss = totalSent > 0 ? (totalSent - totalReceived) / (double)totalSent * 100 : 0;
         int delay = loss switch
         {
             > Constants.Ping.HighLossThreshold => Math.Min(Constants.Ping.Timeout, (int)(Constants.Ping.BaseDelay * 1.5)),
@@ -310,7 +297,6 @@ public class TraceManager : ValidationBase, IDisposable
     private CancellationTokenSource? _cts;
     private bool _disposed;
     private readonly IPingManager _pingManager;
-    private readonly IDnsManager _dnsManager;
     private readonly ObservableCollection<TraceResult> _results;
     private readonly IMemoryCache _memoryCache;
     private bool _isTracing;
@@ -323,8 +309,7 @@ public class TraceManager : ValidationBase, IDisposable
         TraceUrl = url;
         _results = new ObservableCollection<TraceResult>();
         _memoryCache = new MemoryCache(new MemoryCacheOptions());
-        _dnsManager = new DnsManager(_memoryCache);
-        _pingManager = new PingManager(_dnsManager);
+        _pingManager = new PingManager(new DnsManager(_memoryCache));
     }
     public async Task StartTraceAsync(Action<string, Color> updateStatus, Action<string, string, MessageBoxButton, MessageBoxImage> showMessage)
     {
@@ -350,7 +335,7 @@ public class TraceManager : ValidationBase, IDisposable
         Application.Current.Dispatcher.Invoke(() =>
         {
             var existing = _results.FirstOrDefault(r => r.IPAddress == ip);
-            if (existing is null)
+            if (existing == null)
                 _results.Add(new TraceResult(ttl, ip, domain, hop));
             else
                 existing.UpdateStatistics(hop);
@@ -364,7 +349,11 @@ public class TraceManager : ValidationBase, IDisposable
     protected virtual void Dispose(bool disposing)
     {
         if (_disposed) return;
-        if (disposing) { _cts?.Dispose(); _memoryCache.Dispose(); }
+        if (disposing)
+        {
+            _cts?.Dispose();
+            _memoryCache.Dispose();
+        }
         _disposed = true;
     }
     ~TraceManager() => Dispose(false);
