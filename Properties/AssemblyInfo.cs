@@ -7,12 +7,12 @@ using System.Windows;
 // Общие сведения об этой сборке предоставляются следующим набором
 // набор атрибутов. Измените значения этих атрибутов, чтобы изменить сведения,
 // связанные со сборкой.
-[assembly: AssemblyTitle("Пингалятор")]
-[assembly: AssemblyDescription("Программа для проверки и мониторинга Ping. 2 версия")]
+[assembly: AssemblyTitle("Ping Test Tool")]
+[assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("Пингалятор")]
-[assembly: AssemblyCopyright("tuttifrutti ©  2024")]
+[assembly: AssemblyProduct("")]
+[assembly: AssemblyCopyright("diqezit ©  2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -1,0 +1,92 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+    <SolidColorBrush x:Key="CheckBoxCheckedBackground" Color="#007ACC"/>
+    <SolidColorBrush x:Key="CheckBoxCheckedBorder" Color="#007ACC"/>
+    <SolidColorBrush x:Key="CheckBoxForeground" Color="Black"/>
+    <SolidColorBrush x:Key="CheckBoxHoverBackground" Color="#D9EFFF"/>
+    <SolidColorBrush x:Key="CheckBoxHoverBorder" Color="#D9EFFF"/>
+    <SolidColorBrush x:Key="CheckBoxPressedBackground" Color="#B0E0FF"/>
+    <SolidColorBrush x:Key="CheckBoxPressedBorder" Color="#B0E0FF"/>
+    <SolidColorBrush x:Key="CheckMarkColor" Color="Black"/>
+
+    <SolidColorBrush x:Key="ContentBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ContentBorder" Color="#DDDDDD"/>
+
+    <SolidColorBrush x:Key="DataGridAlternatingRowBackground" Color="#F5F5F5"/>
+    <SolidColorBrush x:Key="DataGridBackground" Color="White"/>
+    <SolidColorBrush x:Key="DataGridBorder" Color="#DDDDDD"/>
+    <SolidColorBrush x:Key="DataGridCellSelectedBackground" Color="#CCE5FF"/>
+    <SolidColorBrush x:Key="DataGridCellSelectedBorderBrush" Color="#007ACC"/>
+    <SolidColorBrush x:Key="DataGridCellSelectedForeground" Color="Black"/>
+    <SolidColorBrush x:Key="DataGridForeground" Color="Black"/>
+    <SolidColorBrush x:Key="DataGridHeaderBackground" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="DataGridHeaderBorder" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="DataGridHeaderForeground" Color="Black"/>
+    <SolidColorBrush x:Key="DataGridLinesBrush" Color="#E5E5E5"/>
+    <SolidColorBrush x:Key="DataGridRowBackground" Color="White"/>
+    <SolidColorBrush x:Key="DataGridRowBorder" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="DataGridRowHoverBackground" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="DataGridRowSelectedBackground" Color="#CCE5FF"/>
+    <SolidColorBrush x:Key="DataGridRowSelectedForeground" Color="Black"/>
+
+    <SolidColorBrush x:Key="LabelForeground" Color="Black"/>
+
+    <SolidColorBrush x:Key="MenuBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="MenuItemForeground" Color="#000000"/>
+    <SolidColorBrush x:Key="MenuItemHoverBackground" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="MenuItemSelectionBackground" Color="#CCE5FF"/>
+    <SolidColorBrush x:Key="MenuItemSelectionForeground" Color="Black"/>
+
+    <SolidColorBrush x:Key="PrimaryButtonBackground" Color="#007ACC"/>
+    <SolidColorBrush x:Key="PrimaryButtonBorder" Color="#007ACC"/>
+    <SolidColorBrush x:Key="PrimaryButtonDefaultBackground" Color="#005F9E"/>
+    <SolidColorBrush x:Key="PrimaryButtonDefaultBorder" Color="#005F9E"/>
+    <SolidColorBrush x:Key="PrimaryButtonForeground" Color="White"/>
+    <SolidColorBrush x:Key="PrimaryButtonHoverBackground" Color="#0090D0"/>
+    <SolidColorBrush x:Key="PrimaryButtonHoverBorder" Color="#0090D0"/>
+    <SolidColorBrush x:Key="PrimaryButtonPressedBackground" Color="#0070B0"/>
+    <SolidColorBrush x:Key="PrimaryButtonPressedBorder" Color="#0070B0"/>
+
+    <SolidColorBrush x:Key="ProgressBarBackground" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="ProgressBarBorder" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="ProgressBarForeground" Color="#007ACC"/>
+    <SolidColorBrush x:Key="ProgressBarTextForeground" Color="Black"/>
+
+    <SolidColorBrush x:Key="ResultsBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ResultsTextForeground" Color="#000000"/>
+
+    <SolidColorBrush x:Key="StatusTextBlockForeground" Color="#FF0000"/>
+
+    <SolidColorBrush x:Key="TextBoxBackground" Color="White"/>
+    <SolidColorBrush x:Key="TextBoxBorder" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="TextBoxForeground" Color="Black"/>
+
+    <SolidColorBrush x:Key="TextBlockForeground" Color="Black"/>
+    <SolidColorBrush x:Key="DisabledButtonBackground" Color="#EEEEEE"/>
+    <SolidColorBrush x:Key="DisabledButtonBorder" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="DisabledButtonForeground" Color="#999999"/>
+
+    <SolidColorBrush x:Key="HeaderForeground" Color="#000000"/>
+
+    <SolidColorBrush x:Key="WindowBackground" Color="#FFFFFF"/>
+
+    <BitmapImage x:Key="WarningImageSource" UriSource="/Resources/warning-light.png"/>
+
+    <SolidColorBrush x:Key="MenuItemHoverForeground" Color="#000000"/>
+    <SolidColorBrush x:Key="PrimaryHoverBackground" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="PrimaryHoverBorder" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="PrimaryPressedBackground" Color="#D0D0D0"/>
+    <SolidColorBrush x:Key="SubmenuBackground" Color="#F9F9F9"/>
+    <SolidColorBrush x:Key="SubmenuBorder" Color="#DDDDDD"/>
+    <SolidColorBrush x:Key="MenuItemCheckmark" Color="#007ACC"/>
+
+    <SolidColorBrush x:Key="TabHeaderBackground" Color="#E0E0E0"/>
+    <SolidColorBrush x:Key="SelectedTabBackground" Color="#007ACC"/>
+    <SolidColorBrush x:Key="HoverTabBackground" Color="#D9EFFF"/>
+    <SolidColorBrush x:Key="TabItemForeground" Color="Black"/>
+    <SolidColorBrush x:Key="SelectedTabForeground" Color="White"/>
+
+    <SolidColorBrush x:Key="SubmenuOpenBackground" Color="#F0F0F0"/>
+    <sys:String x:Key="ValidationToolTip">Validation Error</sys:String>
+</ResourceDictionary>
