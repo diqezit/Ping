@@ -2,60 +2,225 @@
 
 namespace PingTestTool
 {
-    #region Constants
-    public static class Constant
+    #region GraphConstants
+
+    public static class GraphConstants
     {
-        public const int MaxVisiblePoints = 100;
-        public const int MinPingInterval = 100;
+        public const int DefaultMaxVisiblePoints = 100;
+        public const int MinPingIntervalMilliseconds = 100;
+        public const string GraphTitle = "Ping Response Time Graph";
+        public static readonly OxyColor GraphBackgroundColor = OxyColors.White;
+        public const string TimeAxisTitle = "Time";
+        public const string TimeAxisFormat = "HH:mm:ss";
+        public const string ResponseAxisTitle = "Response Time (ms)";
+        public static readonly OxyColor LineColor = OxyColor.FromRgb(0, 114, 189);
+        public const OxyPlot.MarkerType MarkerType = OxyPlot.MarkerType.Circle;
+        public const double MarkerSize = 3.0;
+        public static readonly OxyColor MarkerStrokeColor = OxyColor.FromRgb(0, 114, 189);
+        public static readonly OxyColor MarkerFillColor = OxyColors.White;
     }
+
     #endregion
 
     #region Interfaces
+
+    public interface IGraphManager : IDisposable
+    {
+        void UpdateMaxVisiblePoints(int maxVisiblePoints);
+        void UpdateGraph();
+        void SetData(IEnumerable<(DateTime Time, int Value)> data);
+    }
+
     public interface IGraphWindow
     {
         bool IsLoaded { get; }
         WindowState WindowState { get; set; }
         bool IsVisible { get; }
         Visibility Visibility { get; set; }
-        void SetPingData(List<int> roundtripTimes);
+        void SetPingData(List<(DateTime Time, int RoundtripTime)> roundtripTimes);
         void Show();
         void Close();
         event EventHandler? Closed;
     }
 
-    public interface IGraphManager : IDisposable
-    {
-        void UpdateMaxVisiblePoints(int maxVisiblePoints);
-        void UpdateGraph(int maxVisiblePoints);
-        void SetData(IEnumerable<int> data);
-    }
-
     public interface IStatisticsManager : IDisposable
     {
         void UpdateMaxVisiblePoints(int maxVisiblePoints);
-        void SetPingData(IEnumerable<int> data);
-        PingStatistics GetStatistics(List<int> data);
+        void SetPingData(IEnumerable<(DateTime Time, int Value)> data);
+        PingStatistics GetStatistics(IReadOnlyList<int> data);
     }
+
     #endregion
 
-    #region Data Structures
-    public readonly record struct PingStatistics(
-        double Min,
-        double Avg,
-        double Max,
-        double Cur);
+    #region Structs
+
+    public readonly record struct PingStatistics(double Min, double Avg, double Max, double Cur);
+
     #endregion
 
-    #region Implementations
+    #region GraphManager Class
+
+    public class GraphManager : IGraphManager
+    {
+        #region Fields
+
+        private readonly PlotModel _plotModel;
+        private readonly Action<string, string, string, string> _updateTextFields;
+        private readonly IStatisticsManager _statisticsManager;
+        private readonly List<PingData> _dataPoints = new();
+        private readonly object _lock = new();
+        private int _maxVisiblePoints = GraphConstants.DefaultMaxVisiblePoints;
+        private bool _disposed;
+        private readonly LineSeries _lineSeries;
+
+        #endregion
+
+        #region Nested Types
+
+        private record PingData(DateTime Time, int Value);
+
+        #endregion
+
+        #region Constructor
+
+        public GraphManager(
+            PlotModel plotModel,
+            Action<string, string, string, string> updateTextFields,
+            IStatisticsManager statisticsManager)
+        {
+            _plotModel = plotModel;
+            _updateTextFields = updateTextFields;
+            _statisticsManager = statisticsManager;
+            _lineSeries = new LineSeries
+            {
+                Title = "Ping",
+                Color = GraphConstants.LineColor,
+                MarkerType = GraphConstants.MarkerType,
+                MarkerSize = GraphConstants.MarkerSize,
+                MarkerStroke = GraphConstants.MarkerStrokeColor,
+                MarkerFill = GraphConstants.MarkerFillColor
+            };
+            InitializeGraphComponents();
+        }
+
+        #endregion
+
+        #region Public Methods
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            lock (_lock)
+            {
+                _dataPoints.Clear();
+            }
+            _statisticsManager.Dispose();
+            _disposed = true;
+        }
+
+        public void SetData(IEnumerable<(DateTime Time, int Value)> data)
+        {
+            lock (_lock)
+            {
+                foreach (var (time, value) in data)
+                {
+                    if (value > 0)
+                    {
+                        _dataPoints.Add(new PingData(time, value));
+                        if (_dataPoints.Count > _maxVisiblePoints)
+                            _dataPoints.RemoveAt(0);
+                    }
+                }
+            }
+        }
+
+        public void UpdateGraph()
+        {
+            List<PingData> currentData;
+            lock (_lock)
+            {
+                currentData = _dataPoints.ToList();
+            }
+            if (currentData.Count == 0)
+            {
+                _lineSeries.Points.Clear();
+                _plotModel.InvalidatePlot(true);
+                return;
+            }
+
+            currentData.Sort((a, b) => a.Time.CompareTo(b.Time));
+
+            var points = currentData
+                .Select(dp => new DataPoint(DateTimeAxis.ToDouble(dp.Time), dp.Value))
+                .ToList();
+            points.Sort((a, b) => a.X.CompareTo(b.X));
+
+
+            _lineSeries.Points.Clear();
+            _lineSeries.Points.AddRange(points);
+
+            var stats = _statisticsManager.GetStatistics(points.Select(p => (int)p.Y).ToList());
+            _updateTextFields(
+                $"{stats.Min:F1}",
+                $"{stats.Avg:F1}",
+                $"{stats.Max:F1}",
+                $"{stats.Cur:F1}"
+            );
+            _plotModel.InvalidatePlot(true);
+        }
+
+        public void UpdateMaxVisiblePoints(int maxVisiblePoints)
+        {
+            _maxVisiblePoints = maxVisiblePoints;
+            lock (_lock)
+            {
+                if (_dataPoints.Count > _maxVisiblePoints)
+                    _dataPoints.RemoveRange(0, _dataPoints.Count - _maxVisiblePoints);
+            }
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private void InitializeGraphComponents()
+        {
+            _plotModel.Axes.Add(new DateTimeAxis
+            {
+                Position = AxisPosition.Bottom,
+                Title = GraphConstants.TimeAxisTitle,
+                StringFormat = GraphConstants.TimeAxisFormat
+            });
+            _plotModel.Axes.Add(new LinearAxis
+            {
+                Position = AxisPosition.Left,
+                Title = GraphConstants.ResponseAxisTitle,
+                AbsoluteMinimum = 0
+            });
+            _plotModel.Series.Add(_lineSeries);
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region GraphWindow Class
+
     public partial class GraphWindow : Window, INotifyPropertyChanged, IDisposable, IGraphWindow
     {
+        #region Fields
+
         private readonly IGraphManager _graphManager;
         private readonly IStatisticsManager _statisticsManager;
         private readonly DispatcherTimer _updateTimer;
-        private int _maxVisiblePoints = Constant.MaxVisiblePoints;
+        private int _maxVisiblePoints = GraphConstants.DefaultMaxVisiblePoints;
+
+        #endregion
+
+        #region Properties
 
         public PlotModel PingPlotModel { get; }
-        public event PropertyChangedEventHandler? PropertyChanged;
 
         public int MaxVisiblePoints
         {
@@ -65,52 +230,79 @@ namespace PingTestTool
                 if (_maxVisiblePoints != value)
                 {
                     _maxVisiblePoints = value;
-                    OnPropertyChanged(nameof(MaxVisiblePoints));
+                    OnPropertyChanged();
                     _graphManager.UpdateMaxVisiblePoints(value);
                     _statisticsManager.UpdateMaxVisiblePoints(value);
-                    _graphManager.UpdateGraph(_maxVisiblePoints);
+                    _graphManager.UpdateGraph();
                 }
             }
         }
 
-        // Конструктор без зависимости от логирования.
+        #endregion
+
+        #region INotifyPropertyChanged Implementation
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+        #endregion
+
+        #region Constructor
+
         public GraphWindow(int pingInterval)
         {
             InitializeComponent();
             DataContext = this;
             PingPlotModel = new PlotModel
             {
-                Title = "График по времени отклика для Ping",
-                Background = OxyColors.White
+                Title = GraphConstants.GraphTitle,
+                Background = GraphConstants.GraphBackgroundColor
             };
 
             _statisticsManager = new StatisticsManager();
-            _graphManager = new GraphManager(
-                PingPlotModel,
-                UpdateTextFields,
-                _statisticsManager);
+            _graphManager = new GraphManager(PingPlotModel, UpdateTextFields, _statisticsManager);
 
             _updateTimer = new DispatcherTimer
             {
-                Interval = TimeSpan.FromMilliseconds(Math.Max(pingInterval, Constant.MinPingInterval))
+                Interval = TimeSpan.FromMilliseconds(Math.Max(pingInterval, GraphConstants.MinPingIntervalMilliseconds))
             };
-
-            _updateTimer.Tick += (_, _) => Application.Current.Dispatcher.Invoke(() =>
-                _graphManager.UpdateGraph(_maxVisiblePoints));
+            _updateTimer.Tick += (s, e) => _graphManager.UpdateGraph();
             _updateTimer.Start();
         }
 
-        public void SetPingData(List<int>? data)
-        {
-            if (data is null || !data.Any())
-            {
-                return;
-            }
+        #endregion
 
+        #region IGraphWindow Implementation
+
+        public new void Close()
+        {
+            Dispatcher.Invoke(() => base.Close());
+        }
+
+        public void Dispose()
+        {
+            _updateTimer.Stop();
+            _graphManager.Dispose();
+            _statisticsManager.Dispose();
+        }
+
+        public void SetPingData(List<(DateTime Time, int RoundtripTime)> data)
+        {
+            if (data is null || data.Count == 0) return;
             _statisticsManager.SetPingData(data);
             _graphManager.SetData(data);
-            _graphManager.UpdateGraph(MaxVisiblePoints);
+            _graphManager.UpdateGraph();
         }
+
+        public new void Show()
+        {
+            Dispatcher.Invoke(() => base.Show());
+        }
+
+        #endregion
+
+        #region Private Methods
 
         private void UpdateTextFields(string min, string avg, string max, string cur)
         {
@@ -123,205 +315,62 @@ namespace PingTestTool
             });
         }
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        public void Dispose()
-        {
-            _updateTimer.Stop();
-            _graphManager.Dispose();
-            _statisticsManager.Dispose();
-        }
+        #endregion
     }
 
-    public class GraphManager : IGraphManager
+    #endregion
+
+    #region StatisticsManager Class
+
+    public class StatisticsManager : IStatisticsManager
     {
-        private readonly PlotModel _plotModel;
-        private readonly Action<string, string, string, string> _updateTextFields;
-        private readonly ConcurrentDictionary<DateTime, double> _realtimeData = new();
-        private readonly IStatisticsManager _statisticsManager;
-        private readonly LineSeries _normalSeries;
-        private readonly object _lock = new();
+        #region Fields
+
+        private readonly Queue<int> _pingData = new();
+        private int _maxDataPoints = GraphConstants.DefaultMaxVisiblePoints;
         private bool _disposed;
-        private int _maxVisiblePoints = Constant.MaxVisiblePoints;
 
-        // Конструктор без зависимости от логирования.
-        public GraphManager(PlotModel plotModel, Action<string, string, string, string> updateTextFields, IStatisticsManager statisticsManager)
-        {
-            _plotModel = plotModel;
-            _updateTextFields = updateTextFields;
-            _statisticsManager = statisticsManager ?? throw new ArgumentNullException(nameof(statisticsManager));
+        #endregion
 
-            _normalSeries = new LineSeries
-            {
-                Title = "Ping",
-                Color = OxyColor.FromRgb(0, 114, 189),
-                MarkerType = MarkerType.Circle,
-                MarkerSize = 3,
-                MarkerStroke = OxyColor.FromRgb(0, 114, 189),
-                MarkerFill = OxyColors.White,
-            };
-
-            InitializeGraphComponents();
-        }
-
-        private void InitializeGraphComponents()
-        {
-            _plotModel.Axes.Add(new DateTimeAxis
-            {
-                Position = AxisPosition.Bottom,
-                Title = "Время",
-                StringFormat = "HH:mm:ss",
-            });
-
-            _plotModel.Axes.Add(new LinearAxis
-            {
-                Position = AxisPosition.Left,
-                Title = "Время отклика (мс)",
-                AbsoluteMinimum = 0,
-            });
-
-            _plotModel.Series.Add(_normalSeries);
-        }
-
-        public void UpdateMaxVisiblePoints(int maxVisiblePoints)
-        {
-            _maxVisiblePoints = maxVisiblePoints;
-            TrimDataToMaxVisiblePoints();
-        }
-
-        private void TrimDataToMaxVisiblePoints()
-        {
-            lock (_lock)
-            {
-                while (_realtimeData.Count > _maxVisiblePoints)
-                {
-                    var oldestKey = _realtimeData.Keys.Min();
-                    _realtimeData.TryRemove(oldestKey, out _);
-                }
-            }
-        }
-
-        public void UpdateGraph(int maxVisiblePoints)
-        {
-            if (_realtimeData.IsEmpty)
-            {
-                return;
-            }
-
-            var sortedData = FilterAndSortData(maxVisiblePoints);
-
-            _normalSeries.Points.Clear();
-            _normalSeries.Points.AddRange(sortedData);
-
-            var dataValues = _realtimeData.Values.Select(d => (int)d).ToList();
-            var stats = _statisticsManager.GetStatistics(dataValues);
-            _updateTextFields(
-                $"{stats.Min:F1}",
-                $"{stats.Avg:F1}",
-                $"{stats.Max:F1}",
-                $"{stats.Cur:F1}"
-            );
-
-            _plotModel.InvalidatePlot(true);
-        }
-
-        private List<DataPoint> FilterAndSortData(int maxVisiblePoints)
-        {
-            List<DataPoint> sortedData;
-
-            lock (_lock)
-            {
-                sortedData = _realtimeData
-                    .OrderBy(kvp => kvp.Key)
-                    .Skip(Math.Max(0, _realtimeData.Count - maxVisiblePoints))
-                    .Select(kvp => new DataPoint(DateTimeAxis.ToDouble(kvp.Key), kvp.Value))
-                    .Where(dp => dp.Y > 0)
-                    .ToList();
-            }
-
-            return sortedData;
-        }
-
-        public void SetData(IEnumerable<int> data)
-        {
-            var timestamp = DateTime.Now;
-
-            lock (_lock)
-            {
-                foreach (var value in data.Where(x => x > 0))
-                {
-                    _realtimeData[timestamp] = value;
-                    TrimDataToMaxVisiblePoints();
-                }
-            }
-        }
+        #region Public Methods
 
         public void Dispose()
         {
             if (_disposed) return;
-
-            lock (_lock)
-            {
-                _realtimeData.Clear();
-            }
-
-            _statisticsManager.Dispose();
+            _pingData.Clear();
             _disposed = true;
         }
-    }
 
-    public class StatisticsManager : IStatisticsManager
-    {
-        private readonly ConcurrentQueue<int> _pingData = new();
-        private int _maxDataPoints = Constant.MaxVisiblePoints;
-        private bool _disposed;
+        public PingStatistics GetStatistics(IReadOnlyList<int> data)
+        {
+            if (data.Count == 0) return new PingStatistics(0, 0, 0, 0);
+            return new PingStatistics(data.Min(), data.Average(), data.Max(), data.Last());
+        }
+
+        public void SetPingData(IEnumerable<(DateTime Time, int Value)> data)
+        {
+            foreach (var (_, value) in data)
+            {
+                if (value > 0)
+                {
+                    _pingData.Enqueue(value);
+                    if (_pingData.Count > _maxDataPoints)
+                        _pingData.Dequeue();
+                }
+            }
+        }
 
         public void UpdateMaxVisiblePoints(int maxVisiblePoints)
         {
             _maxDataPoints = maxVisiblePoints;
-            TrimDataToMaxVisiblePoints();
-        }
-
-        private void TrimDataToMaxVisiblePoints()
-        {
             while (_pingData.Count > _maxDataPoints)
             {
-                _pingData.TryDequeue(out _);
+                _pingData.Dequeue();
             }
         }
 
-        public void SetPingData(IEnumerable<int> data)
-        {
-            foreach (var value in data.Where(x => x > 0))
-            {
-                _pingData.Enqueue(value);
-                TrimDataToMaxVisiblePoints();
-            }
-        }
-
-        public PingStatistics GetStatistics(List<int> data)
-        {
-            if (data == null || data.Count == 0)
-                return new PingStatistics(0, 0, 0, 0);
-
-            return new PingStatistics(
-                data.Min(),
-                data.Average(),
-                data.Max(),
-                data.Last()
-            );
-        }
-
-        public void Dispose()
-        {
-            if (_disposed) return;
-
-            while (_pingData.TryDequeue(out _)) { }
-            _disposed = true;
-        }
+        #endregion
     }
+
     #endregion
 }

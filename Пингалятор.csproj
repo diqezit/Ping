@@ -8,7 +8,7 @@
     <ProjectGuid>{19E91B1C-5228-4843-823D-E6984BE94277}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <RootNamespace>Пингалятор</RootNamespace>
-    <AssemblyName>Пингалятор</AssemblyName>
+    <AssemblyName>PingTestTool</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -57,7 +57,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>Пингалятор.App</StartupObject>
+    <StartupObject>PingTestTool.App</StartupObject>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationIcon>computr.ico</ApplicationIcon>
@@ -209,16 +209,16 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="PingService.cs" />
     <Compile Include="Service\CompileService.cs" />
     <Compile Include="Service\GlobalUsings.cs" />
     <Compile Include="Service\RelayCommand.cs" />
-    <Compile Include="TraceWindow.xaml.cs">
-      <DependentUpon>TraceWindow.xaml</DependentUpon>
-    </Compile>
-    <Page Include="CommonResources.xaml">
+    <Compile Include="TraceRouteService.cs" />
+    <Resource Include="Themes\CommonStyles.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
-    </Page>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
     <Page Include="GraphWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -237,10 +237,20 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="TraceWindow.xaml">
+    <Resource Include="Resources\StringResources.en.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
-    </Page>
+    </Resource>
+    <Resource Include="Resources\StringResources.ru.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Resource>
+    <Resource Include="Themes\DarkTheme.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Resource>
+    <Resource Include="Themes\LightTheme.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Resource>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
