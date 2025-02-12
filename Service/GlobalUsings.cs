@@ -22,10 +22,8 @@ global using System.Collections.ObjectModel;
 global using System.Windows.Media;
 global using System.Text.RegularExpressions;
 global using System.Windows.Controls;
-global using Microsoft.Win32;
 global using System.IO;
 global using System.Windows.Data;
-global using System.Globalization;
-global using Microsoft.Extensions.ObjectPool;
+global using System.Reflection;
 
 
