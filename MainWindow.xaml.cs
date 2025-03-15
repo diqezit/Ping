@@ -58,36 +58,13 @@ namespace PingTestTool
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount == 2)
-                BtnMaximize_Click(sender, e);
-            else
-                DragMove();
+            WindowHelper.HandleTitleBarMouseLeftButtonDown(this, e);
         }
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
             UpdateMaximizeRestoreButton();
-            AdjustWindowCorners();
-        }
-
-        private void AdjustWindowCorners()
-        {
-            bool isMaximized = WindowState == WindowState.Maximized;
-            BorderThickness = new Thickness(isMaximized ? 0 : 1);
-
-            if (Content is Border mainBorder)
-            {
-                mainBorder.CornerRadius = new CornerRadius(isMaximized ? 0 : 12);
-
-                if (mainBorder.Child is Grid grid &&
-                    grid.Children.Count > 0 &&
-                    grid.Children[0] is Border titleBar)
-                {
-                    titleBar.CornerRadius = isMaximized
-                        ? new CornerRadius(0)
-                        : new CornerRadius(12, 12, 0, 0);
-                }
-            }
+            WindowHelper.AdjustWindowCorners(this);
         }
 
         private void UpdateMaximizeRestoreButton()
@@ -394,6 +371,47 @@ namespace PingTestTool
                 btnPing.Content = FindResource("StartTestButton");
                 btnPing.IsEnabled = true;
             });
+        #endregion
+
+        #region логика управления окнами
+
+        public static class WindowHelper
+        {
+            public static void AdjustWindowCorners(Window window)
+            {
+                bool isMaximized = window.WindowState == WindowState.Maximized;
+                window.BorderThickness = new Thickness(isMaximized ? 0 : 1);
+
+                if (window.Content is Border mainBorder)
+                {
+                    mainBorder.CornerRadius = new CornerRadius(isMaximized ? 0 : 12);
+
+                    if (mainBorder.Child is Grid grid &&
+                        grid.Children.Count > 0 &&
+                        grid.Children[0] is Border titleBar)
+                    {
+                        titleBar.CornerRadius = isMaximized
+                            ? new CornerRadius(0)
+                            : new CornerRadius(12, 12, 0, 0);
+                    }
+                }
+            }
+
+            public static void HandleTitleBarMouseLeftButtonDown(Window window, MouseButtonEventArgs e)
+            {
+                if (e.ClickCount == 2)
+                {
+                    window.WindowState = window.WindowState == WindowState.Maximized
+                        ? WindowState.Normal
+                        : WindowState.Maximized;
+                }
+                else
+                {
+                    window.DragMove();
+                }
+            }
+        }
+
         #endregion
     }
 }

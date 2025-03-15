@@ -1,5 +1,7 @@
 ﻿#nullable enable
 
+using static PingTestTool.MainWindow;
+
 namespace PingTestTool
 {
     #region GraphConstants
@@ -269,14 +271,11 @@ namespace PingTestTool
             _graphManager.UpdateGraph();
 
         private void GraphWindow_StateChanged(object? sender, EventArgs e) =>
-            AdjustWindowCorners();
+            WindowHelper.AdjustWindowCorners(this);
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ClickCount == 2)
-                WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-            else
-                DragMove();
+            WindowHelper.HandleTitleBarMouseLeftButtonDown(this, e);
         }
 
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) =>
@@ -287,25 +286,6 @@ namespace PingTestTool
         #endregion
 
         #region UI Helpers
-        private void AdjustWindowCorners()
-        {
-            var isMaximized = WindowState == WindowState.Maximized;
-            BorderThickness = new Thickness(isMaximized ? 0 : 1);
-
-            if (Content is Border mainBorder)
-            {
-                mainBorder.CornerRadius = new CornerRadius(isMaximized ? 0 : 12);
-
-                if (mainBorder.Child is Grid grid &&
-                    grid.Children.Count > 0 &&
-                    grid.Children[0] is Border titleBar)
-                {
-                    titleBar.CornerRadius = isMaximized
-                        ? new CornerRadius(0)
-                        : new CornerRadius(12, 12, 0, 0);
-                }
-            }
-        }
 
         private void ApplyThemeToPlot()
         {
