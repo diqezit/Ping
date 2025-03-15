@@ -303,18 +303,22 @@ namespace PingTestTool
 
             return (Constants.Ping.MaxTtl, delay);
         }
-
+        
         private async Task ExecuteRoundAsync(string host, int maxTtl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
         {
-            var tasks = Enumerable.Range(1, maxTtl)
-                .Select(ttl => ExecuteForTtlAsync(host, ttl, updateUiCallback, token));
-            await Task.WhenAll(tasks);
+            await ExecuteParallelAsync(Enumerable.Range(1, maxTtl),
+                ttl => ExecuteForTtlAsync(host, ttl, updateUiCallback, token));
         }
 
         private async Task ExecuteForTtlAsync(string host, int ttl, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
         {
-            var tasks = Enumerable.Range(0, Constants.Ping.ParallelRequests)
-                .Select(_ => ExecuteSingleAsync(host, ttl, updateUiCallback, token));
+            await ExecuteParallelAsync(Enumerable.Range(0, Constants.Ping.ParallelRequests),
+                _ => ExecuteSingleAsync(host, ttl, updateUiCallback, token));
+        }
+
+        private async Task ExecuteParallelAsync(IEnumerable<int> range, Func<int, Task> action)
+        {
+            var tasks = range.Select(action);
             await Task.WhenAll(tasks);
         }
 
