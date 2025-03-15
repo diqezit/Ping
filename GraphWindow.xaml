@@ -23,7 +23,9 @@
             BorderBrush="{DynamicResource ContentBorder}"
             BorderThickness="1"
             CornerRadius="12">
-        <Grid>
+        <Grid UseLayoutRounding="True" 
+              SnapsToDevicePixels="True" 
+              TextOptions.TextFormattingMode="Display">
             <Grid.RowDefinitions>
                 <RowDefinition Height="40"/>
                 <RowDefinition Height="*"/>
