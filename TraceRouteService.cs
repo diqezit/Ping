@@ -6,21 +6,21 @@ namespace PingTestTool
 
     public static class Constants
     {
-        public const string DefaultUnresolvedValue = "---";
-        public const string MsUnitSuffix = " ms";
-        public const string PercentageSuffix = "%";
-        public const string DefaultFormat = "F0";
+        public const string DefaultUnresolvedValue = "---",
+                            MsUnitSuffix = " ms",
+                            PercentageSuffix = "%",
+                            DefaultFormat = "F0";
 
         public static class Ping
         {
-            public const int BufferSize = 32;
-            public const int MaxTtl = 12;
-            public const int Timeout = 5000;
-            public const int ParallelRequests = 1;
-            public const int BaseDelay = 1000;
-            public const int MinDelay = 100;
-            public const double HighLossThreshold = 50;
-            public const double LowLossThreshold = 10;
+            public const int BufferSize = 32,
+                             MaxTtl = 12,
+                             Timeout = 5000,
+                             ParallelRequests = 1,
+                             BaseDelay = 1000,
+                             MinDelay = 100;
+            public const double HighLossThreshold = 50,
+                                LowLossThreshold = 10;
         }
     }
 
@@ -64,14 +64,14 @@ namespace PingTestTool
         protected bool SetProperty<T>(T value, [CallerMemberName] string? name = null)
         {
             if (name == null) return false;
+
             var old = _values.GetOrAdd(name, default(T)!);
-            if (!EqualityComparer<T>.Default.Equals((T)old, value))
-            {
-                _values[name] = value!;
-                OnPropertyChanged(name);
-                return true;
-            }
-            return false;
+            if (EqualityComparer<T>.Default.Equals((T)old, value))
+                return false;
+
+            _values[name] = value!;
+            OnPropertyChanged(name);
+            return true;
         }
 
         protected T GetProperty<T>(T defaultValue = default!, [CallerMemberName] string? name = null) =>
@@ -94,6 +94,8 @@ namespace PingTestTool
 
     #region Data Models
 
+    public record NetworkSettings(TimeSpan DnsTimeout, MemoryCacheEntryOptions CacheOptions);
+
     public class TraceResult : ObservableBase
     {
         public int Nr { get => GetProperty(0); set => SetProperty(value); }
@@ -109,7 +111,7 @@ namespace PingTestTool
 
         public TraceResult(int ttl, string ipAddress, string domainName, HopData hop)
         {
-            if (hop == null) throw new ArgumentNullException(nameof(hop));
+            ValidateHop(hop);
             Nr = ttl;
             IPAddress = ipAddress;
             DomainName = domainName;
@@ -118,7 +120,7 @@ namespace PingTestTool
 
         public void UpdateStatistics(HopData hop)
         {
-            if (hop == null) throw new ArgumentNullException(nameof(hop));
+            ValidateHop(hop);
             var stats = hop.GetStatistics();
             Sent = hop.Sent.ToString();
             Received = hop.Received.ToString();
@@ -130,6 +132,9 @@ namespace PingTestTool
         }
 
         private static string FormatMs(long ms) => $"{ms}{Constants.MsUnitSuffix}";
+
+        private static void ValidateHop(HopData hop) =>
+            _ = hop ?? throw new ArgumentNullException(nameof(hop));
 
         public override string ToString() =>
             $"TTL: {Nr}, IP: {IPAddress}, Domain: {DomainName}, Loss: {Loss}, Sent: {Sent}, Received: {Received}, " +
@@ -155,17 +160,26 @@ namespace PingTestTool
             _needUpdate = true;
         }
 
-        public double CalculateLossPercentage() => Sent == 0 ? 0 : (double)(Sent - Received) / Sent * 100;
+        public double CalculateLossPercentage() =>
+            Sent == 0 ? 0 : (double)(Sent - Received) / Sent * 100;
 
         public (long Min, long Max, double Avg, long Last, double LossPercentage) GetStatistics()
         {
             if (_times.IsEmpty) return (0, 0, 0, 0, 0);
             if (!_needUpdate) return _cached;
+
             lock (_lock)
             {
                 if (!_needUpdate) return _cached;
+
                 var arr = _times.ToArray();
-                _cached = (arr.Min(), arr.Max(), arr.Average(), _last, CalculateLossPercentage());
+                _cached = (
+                    arr.Min(),
+                    arr.Max(),
+                    arr.Average(),
+                    _last,
+                    CalculateLossPercentage()
+                );
                 _needUpdate = false;
                 return _cached;
             }
@@ -176,7 +190,6 @@ namespace PingTestTool
             lock (_lock)
             {
                 // ConcurrentQueue does not have a Clear method.
-                // Clearing ConcurrentQueue by extracting elements from the queue until it is empty.
                 while (_times.TryDequeue(out _)) { }
                 _last = 0;
                 _needUpdate = true;
@@ -207,16 +220,25 @@ namespace PingTestTool
                 .SetSlidingExpiration(TimeSpan.FromMinutes(10));
         }
 
+        public DnsManager(IMemoryCache memoryCache, NetworkSettings settings)
+        {
+            ValidateNotNull(memoryCache, nameof(memoryCache));
+            ValidateNotNull(settings, nameof(settings));
+            _cache = memoryCache;
+            _dnsTimeout = settings.DnsTimeout;
+            _cacheOptions = settings.CacheOptions;
+        }
+
         public async Task<string> GetDomainNameAsync(string ipAddress, CancellationToken token)
         {
             ValidateNotNullOrEmpty(ipAddress, nameof(ipAddress));
+
             if (!IPAddress.TryParse(ipAddress, out var parsed))
                 throw new ArgumentException("Incorrect IP address", nameof(ipAddress));
 
-            if (_cache.TryGetValue(ipAddress, out string? cached))
-                return cached ?? Constants.DefaultUnresolvedValue;
-
-            return await ResolveAsync(ipAddress, parsed, token);
+            return _cache.TryGetValue(ipAddress, out string? cached)
+                ? cached ?? Constants.DefaultUnresolvedValue
+                : await ResolveAsync(ipAddress, parsed, token);
         }
 
         private async Task<string> ResolveAsync(string ipAddress, IPAddress parsed, CancellationToken token)
@@ -225,6 +247,7 @@ namespace PingTestTool
             {
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
                 cts.CancelAfter(_dnsTimeout);
+
                 var entry = await Dns.GetHostEntryAsync(parsed);
                 string result = entry.HostName;
                 _cache.Set(ipAddress, result, _cacheOptions);
@@ -304,25 +327,41 @@ namespace PingTestTool
                 if (reply != null)
                     await ProcessReplyAsync(reply, ttl, elapsed, updateUiCallback, token);
             }
-            catch (PingException) { }
-            catch (Exception ex) when (!(ex is OperationCanceledException)) { }
+            catch (PingException) { /* Ignored - common ping errors */ }
+            catch (Exception ex) when (!(ex is OperationCanceledException)) { /* Ignored - other non-cancellation errors */ }
         }
 
         private static async Task<(PingReply? Reply, long Elapsed)> SendAsync(Ping ping, string host, int ttl, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var reply = await ping.SendPingAsync(host, Constants.Ping.Timeout, new byte[Constants.Ping.BufferSize], new PingOptions { Ttl = ttl });
+            var reply = await ping.SendPingAsync(
+                host,
+                Constants.Ping.Timeout,
+                new byte[Constants.Ping.BufferSize],
+                new PingOptions { Ttl = ttl }
+            );
             sw.Stop();
+
             return (reply, sw.ElapsedMilliseconds);
         }
 
         private async Task ProcessReplyAsync(PingReply reply, int ttl, long elapsed, Action<string, int, string, HopData> updateUiCallback, CancellationToken token)
         {
             var ip = reply.Address?.ToString() ?? "Unknown address";
-            if (string.IsNullOrWhiteSpace(ip) || ip.Trim() == "0.0.0.0") return;
+            if (string.IsNullOrWhiteSpace(ip) || ip.Trim() == "0.0.0.0")
+                return;
 
             var hop = _hops.GetOrAdd(ip, _ => new HopData());
+            UpdateHopStatistics(reply, hop, elapsed);
+
+            string domain = await ResolveDomainAsync(ip, token);
+            updateUiCallback(ip, ttl, domain, hop);
+        }
+
+        private static void UpdateHopStatistics(PingReply reply, HopData hop, long elapsed)
+        {
             lock (hop)
             {
                 hop.Sent++;
@@ -332,13 +371,22 @@ namespace PingTestTool
                     hop.AddResponseTime(elapsed);
                 }
             }
+        }
 
-            string domain;
-            try { domain = await _dnsManager.GetDomainNameAsync(ip, token); }
-            catch (OperationCanceledException) { domain = ip; }
-            catch { domain = ip; }
-
-            updateUiCallback(ip, ttl, domain, hop);
+        private async Task<string> ResolveDomainAsync(string ip, CancellationToken token)
+        {
+            try
+            {
+                return await _dnsManager.GetDomainNameAsync(ip, token);
+            }
+            catch (OperationCanceledException)
+            {
+                return ip;
+            }
+            catch
+            {
+                return ip;
+            }
         }
     }
 
@@ -368,12 +416,18 @@ namespace PingTestTool
         {
             if (IsTracing)
             {
-                showMessage(FindResourceStringStatic("TraceAlreadyRunning"), FindResourceStringStatic("WarningCaption"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                showMessage(
+                    FindResourceStringStatic("TraceAlreadyRunning"),
+                    FindResourceStringStatic("WarningCaption"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning
+                );
                 return;
             }
 
             IsTracing = true;
             updateStatus(FindResourceStringStatic("TraceStarted"), Colors.Green);
+
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
 
@@ -381,10 +435,18 @@ namespace PingTestTool
             {
                 await _pingManager.StartTraceAsync(TraceUrl, _cts.Token, UpdateResult);
             }
-            catch (OperationCanceledException) { /* Ignored cancellation */ }
+            catch (OperationCanceledException)
+            {
+                /* Ignored cancellation */
+            }
             catch (Exception ex)
             {
-                showMessage(string.Format(FindResourceStringStatic("TraceError"), ex.Message), FindResourceStringStatic("ErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Error);
+                showMessage(
+                    string.Format(FindResourceStringStatic("TraceError"), ex.Message),
+                    FindResourceStringStatic("ErrorCaption"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
             }
             finally
             {
@@ -393,10 +455,7 @@ namespace PingTestTool
             }
         }
 
-        public void StopTrace()
-        {
-            try { _cts?.Cancel(); } catch { /* ignored exception on cancel */}
-        }
+        public void StopTrace() => _cts?.Cancel();
 
         public void ClearResults()
         {
@@ -412,13 +471,10 @@ namespace PingTestTool
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!_disposed)
+            if (!_disposed && disposing)
             {
-                if (disposing)
-                {
-                    _cts?.Dispose();
-                    _memoryCache.Dispose();
-                }
+                _cts?.Dispose();
+                _memoryCache.Dispose();
                 _disposed = true;
             }
         }
@@ -427,7 +483,8 @@ namespace PingTestTool
 
         private void UpdateResult(string ip, int ttl, string domain, HopData hop)
         {
-            if (string.IsNullOrWhiteSpace(ip)) return;
+            if (string.IsNullOrWhiteSpace(ip))
+                return;
 
             Application.Current.Dispatcher.Invoke(() =>
             {
@@ -439,8 +496,8 @@ namespace PingTestTool
             });
         }
 
-        private static string FindResourceStringStatic(string resourceKey)
-            => Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
+        private static string FindResourceStringStatic(string resourceKey) =>
+            Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
     }
 
     #endregion

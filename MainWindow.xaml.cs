@@ -4,30 +4,32 @@ namespace PingTestTool
 {
     public partial class MainWindow : Window, IDisposable
     {
-        #region Constants
+        #region Constants and Fields
         public const string DEFAULT_URL = "8.8.8.8";
-        public const int DEFAULT_PING_COUNT = 10;
-        public const int DEFAULT_TIMEOUT = 1000;
-        private static readonly string _themeBaseDir = "Themes";
-        private static readonly string _languageBaseDir = "Resources";
-        #endregion
+        public const int DEFAULT_PING_COUNT = 10, DEFAULT_TIMEOUT = 1000;
+        private static readonly string _themeBaseDir = "Themes", _languageBaseDir = "Resources";
 
-        #region Fields
         private readonly MainWindowEventHandler _handler;
         private TraceManager? _traceManager;
         private bool _disposed;
         #endregion
 
+        #region Initialization
         public MainWindow() : this(new PingService()) { }
 
         public MainWindow(IPingTestService pingService)
         {
             InitializeComponent();
-            _handler = new MainWindowEventHandler(this, pingService,
+
+            _handler = new MainWindowEventHandler(
+                this,
+                pingService,
                 new InputValidator(),
-                new WarningPresenter(imgWarning, imgWarning_1, imgWarning_3));
+                new WarningPresenter(imgWarning, imgWarning_1, imgWarning_3)
+            );
 
             InitializeWindow();
+            StateChanged += MainWindow_StateChanged;
         }
 
         private void InitializeWindow()
@@ -40,10 +42,65 @@ namespace PingTestTool
             txtPingCount.Text = DEFAULT_PING_COUNT.ToString();
             txtTimeout.Text = DEFAULT_TIMEOUT.ToString();
 
+            UpdateMaximizeRestoreButton();
             ApplyLanguage("StringResources.en.xaml");
         }
+        #endregion
 
-        #region Button Click Events
+        #region Window Control Handlers
+        private void BtnMinimize_Click(object sender, RoutedEventArgs e) =>
+            WindowState = WindowState.Minimized;
+
+        private void BtnMaximize_Click(object sender, RoutedEventArgs e) =>
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+                BtnMaximize_Click(sender, e);
+            else
+                DragMove();
+        }
+
+        private void MainWindow_StateChanged(object sender, EventArgs e)
+        {
+            UpdateMaximizeRestoreButton();
+            AdjustWindowCorners();
+        }
+
+        private void AdjustWindowCorners()
+        {
+            bool isMaximized = WindowState == WindowState.Maximized;
+            BorderThickness = new Thickness(isMaximized ? 0 : 1);
+
+            if (Content is Border mainBorder)
+            {
+                mainBorder.CornerRadius = new CornerRadius(isMaximized ? 0 : 12);
+
+                if (mainBorder.Child is Grid grid &&
+                    grid.Children.Count > 0 &&
+                    grid.Children[0] is Border titleBar)
+                {
+                    titleBar.CornerRadius = isMaximized
+                        ? new CornerRadius(0)
+                        : new CornerRadius(12, 12, 0, 0);
+                }
+            }
+        }
+
+        private void UpdateMaximizeRestoreButton()
+        {
+            if (MaximizeIcon == null) return;
+
+            MaximizeIcon.Data = WindowState == WindowState.Maximized
+                ? Geometry.Parse("M2,2 L10,2 L10,10 L2,10 Z M0,4 L8,4 L8,12 L0,12 Z")
+                : Geometry.Parse("M0,0 L10,0 L10,10 L0,10 Z");
+        }
+        #endregion
+
+        #region Ping UI Events
         private async void BtnPing_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -84,11 +141,13 @@ namespace PingTestTool
         {
             try
             {
-                MessageBoxResult result = MessageBox.Show(FindResourceStringStatic("ClearPingResultsConfirmation"),
-                                                     FindResourceStringStatic("ConfirmationCaption"),
-                                                     MessageBoxButton.YesNo,
-                                                     MessageBoxImage.Question);
-                if (result == MessageBoxResult.Yes)
+                var (confirmMessage, confirmCaption) = (
+                    FindResourceStringStatic("ClearPingResultsConfirmation"),
+                    FindResourceStringStatic("ConfirmationCaption")
+                );
+
+                if (MessageBox.Show(confirmMessage, confirmCaption,
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
                     txtResults.Clear();
                 }
@@ -103,17 +162,19 @@ namespace PingTestTool
         #region Traceroute Functionality
         private bool ValidateStartTrace()
         {
-            if (_traceManager != null && _traceManager.IsTracing)
+            if (_traceManager?.IsTracing == true)
             {
                 ShowMessage("Trace is already running.", "Warning");
                 return false;
             }
+
             if (string.IsNullOrWhiteSpace(txtURL.Text))
             {
                 ShowMessage("Please specify URL for tracing.", "Error",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
+
             return true;
         }
 
@@ -139,10 +200,9 @@ namespace PingTestTool
             using (_traceManager = new TraceManager(txtURL.Text))
             {
                 ResultsList.ItemsSource = CollectionViewSource.GetDefaultView(_traceManager.TraceResults);
+
                 if (ResultsList.ItemsSource is ICollectionView view)
-                {
                     view.SortDescriptions.Add(new SortDescription("Nr", ListSortDirection.Ascending));
-                }
 
                 await _traceManager.StartTraceAsync(UpdateStatus, ShowMessage);
             }
@@ -184,9 +244,7 @@ namespace PingTestTool
                 };
 
                 if (dlg.ShowDialog() == true)
-                {
                     SaveResults(dlg.FileName);
-                }
             }
             catch (Exception ex)
             {
@@ -204,7 +262,7 @@ namespace PingTestTool
                     return;
                 }
 
-                System.IO.File.WriteAllLines(fileName,
+                File.WriteAllLines(fileName,
                     _traceManager.TraceResults.Select(r => r?.ToString() ?? "Empty result"));
                 ShowMessage("Results saved successfully.", "Success");
             }
@@ -215,71 +273,55 @@ namespace PingTestTool
             }
         }
 
-        private void SetTraceControlsState(bool tracing)
-        {
+        private void SetTraceControlsState(bool tracing) =>
             Dispatcher.Invoke(() =>
             {
                 btnStartTrace.IsEnabled = !tracing;
                 btnStopTrace.IsEnabled = tracing;
             });
-        }
 
-        private void UpdateStatus(string msg, Color color)
-        {
+        private void UpdateStatus(string msg, Color color) =>
             Dispatcher.Invoke(() =>
             {
                 StatusTextBlock.Text = msg;
                 StatusTextBlock.Foreground = new SolidColorBrush(color);
             });
-        }
         #endregion
 
-        #region Theme & Language Application
-        private void DarkTheme_Click(object sender, RoutedEventArgs e)
+        #region Theme & Language Handling
+        private void DarkTheme_Click(object sender, RoutedEventArgs e) =>
+            ApplyThemeWithErrorHandling("DarkTheme.xaml");
+
+        private void LightTheme_Click(object sender, RoutedEventArgs e) =>
+            ApplyThemeWithErrorHandling("LightTheme.xaml");
+
+        private void RussianLanguage_Click(object sender, RoutedEventArgs e) =>
+            ApplyLanguageWithErrorHandling("StringResources.ru.xaml");
+
+        private void EnglishLanguage_Click(object sender, RoutedEventArgs e) =>
+            ApplyLanguageWithErrorHandling("StringResources.en.xaml");
+
+        private void ApplyThemeWithErrorHandling(string themeName)
         {
             try
             {
-                ApplyTheme("DarkTheme.xaml");
+                ApplyTheme(themeName);
             }
             catch (Exception ex)
             {
-                ShowMessage($"Error applying dark theme: {ex.Message}", "Theme Error");
+                ShowMessage($"Error applying theme: {ex.Message}", "Theme Error");
             }
         }
 
-        private void LightTheme_Click(object sender, RoutedEventArgs e)
+        private void ApplyLanguageWithErrorHandling(string languageName)
         {
             try
             {
-                ApplyTheme("LightTheme.xaml");
+                ApplyLanguage(languageName);
             }
             catch (Exception ex)
             {
-                ShowMessage($"Error applying light theme: {ex.Message}", "Theme Error");
-            }
-        }
-
-        private void RussianLanguage_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                ApplyLanguage("StringResources.ru.xaml");
-            }
-            catch (Exception ex)
-            {
-                ShowMessage($"Error applying Russian language: {ex.Message}", "Language Error");
-            }
-        }
-
-        private void EnglishLanguage_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                ApplyLanguage("StringResources.en.xaml");
-            }
-            catch (Exception ex)
-            {
-                ShowMessage($"Error applying English language: {ex.Message}", "Language Error");
+                ShowMessage($"Error applying language: {ex.Message}", "Language Error");
             }
         }
 
@@ -293,7 +335,8 @@ namespace PingTestTool
         {
             try
             {
-                var uri = new Uri($"pack://application:,,,/{GetType().Assembly.GetName().Name};component/{resourcePath}", UriKind.Absolute);
+                var assemblyName = GetType().Assembly.GetName().Name;
+                var uri = new Uri($"pack://application:,,,/{assemblyName};component/{resourcePath}", UriKind.Absolute);
                 var newResourceDictionary = new ResourceDictionary { Source = uri };
 
                 UpdateResourceDictionaries(Application.Current.Resources.MergedDictionaries, newResourceDictionary, baseDir);
@@ -311,11 +354,9 @@ namespace PingTestTool
             for (int i = dictionaries.Count - 1; i >= 0; i--)
             {
                 var source = dictionaries[i].Source?.ToString();
-                if (source != null && source.Contains($"/{baseDir}/"))
+                if (source != null && source.Contains($"/{baseDir}/") &&
+                    !(baseDir == "Themes" && source.EndsWith("CommonStyles.xaml", StringComparison.OrdinalIgnoreCase)))
                 {
-                    if (baseDir == "Themes" &&
-                        source.EndsWith("CommonStyles.xaml", StringComparison.OrdinalIgnoreCase))
-                        continue;
                     dictionaries.RemoveAt(i);
                 }
             }
@@ -323,7 +364,7 @@ namespace PingTestTool
         }
         #endregion
 
-        #region Resource Management
+        #region Resource Management & Disposal
         private void HandleWindowClosed(object? sender, EventArgs e)
         {
             try
@@ -342,50 +383,51 @@ namespace PingTestTool
             if (_disposed) return;
 
             _traceManager?.Dispose();
+
             if (_handler is IDisposable disposableHandler)
-            {
                 disposableHandler.Dispose();
-            }
 
             AppDomain.CurrentDomain.UnhandledException -= HandleUnhandledException;
             Closed -= HandleWindowClosed;
+            StateChanged -= MainWindow_StateChanged;
 
             _disposed = true;
             GC.SuppressFinalize(this);
         }
         #endregion
 
-        #region Error Handling
+        #region Error Handling & Message Display
         private static void HandleUnhandledException(object? sender, UnhandledExceptionEventArgs e)
         {
             if (e.ExceptionObject is Exception ex)
             {
-                MessageBox.Show($"{FindResourceStringStatic("CriticalError")}: {ex.Message}",
+                MessageBox.Show(
+                    $"{FindResourceStringStatic("CriticalError")}: {ex.Message}",
                     FindResourceStringStatic("ErrorCaption"),
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error
+                );
             }
         }
 
-        private static string FindResourceStringStatic(string resourceKey)
-            => Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
+        private static string FindResourceStringStatic(string resourceKey) =>
+            Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
 
-        private void ShowMessage(string msg, string title,
+        private void ShowMessage(
+            string msg,
+            string title,
             MessageBoxButton btn = MessageBoxButton.OK,
-            MessageBoxImage icon = MessageBoxImage.Information)
-        {
-            Dispatcher.Invoke(() => MessageBox.Show(msg, title, btn, icon));
-        }
+            MessageBoxImage icon = MessageBoxImage.Information
+        ) => Dispatcher.Invoke(() => MessageBox.Show(msg, title, btn, icon));
         #endregion
 
         #region UI Updates
-        public void ResetPingTestUI()
-        {
+        public void ResetPingTestUI() =>
             Dispatcher.Invoke(() =>
             {
                 btnPing.Content = FindResource("StartTestButton");
                 btnPing.IsEnabled = true;
             });
-        }
         #endregion
     }
 }
