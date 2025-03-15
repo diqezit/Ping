@@ -142,8 +142,8 @@ namespace PingTestTool
             try
             {
                 var (confirmMessage, confirmCaption) = (
-                    FindResourceStringStatic("ClearPingResultsConfirmation"),
-                    FindResourceStringStatic("ConfirmationCaption")
+                    ResourceHelper.FindResourceString("ClearPingResultsConfirmation"),
+                    ResourceHelper.FindResourceString("ConfirmationCaption")
                 );
 
                 if (MessageBox.Show(confirmMessage, confirmCaption,
@@ -326,42 +326,11 @@ namespace PingTestTool
         }
 
         private void ApplyTheme(string themeFileName) =>
-            ApplyResourceDictionary($"{_themeBaseDir}/{themeFileName}", _themeBaseDir);
+            ResourceHelper.ApplyResourceDictionary($"{_themeBaseDir}/{themeFileName}", _themeBaseDir, this);
 
         private void ApplyLanguage(string languageFileName) =>
-            ApplyResourceDictionary($"{_languageBaseDir}/{languageFileName}", _languageBaseDir);
+            ResourceHelper.ApplyResourceDictionary($"{_languageBaseDir}/{languageFileName}", _languageBaseDir, this);
 
-        private void ApplyResourceDictionary(string resourcePath, string baseDir)
-        {
-            try
-            {
-                var assemblyName = GetType().Assembly.GetName().Name;
-                var uri = new Uri($"pack://application:,,,/{assemblyName};component/{resourcePath}", UriKind.Absolute);
-                var newResourceDictionary = new ResourceDictionary { Source = uri };
-
-                UpdateResourceDictionaries(Application.Current.Resources.MergedDictionaries, newResourceDictionary, baseDir);
-                UpdateResourceDictionaries(Resources.MergedDictionaries, newResourceDictionary, baseDir);
-            }
-            catch (Exception ex)
-            {
-                ShowMessage($"Error applying resources: {ex.Message}", "Resource Error");
-            }
-        }
-
-        private static void UpdateResourceDictionaries(Collection<ResourceDictionary> dictionaries,
-            ResourceDictionary newResourceDictionary, string baseDir)
-        {
-            for (int i = dictionaries.Count - 1; i >= 0; i--)
-            {
-                var source = dictionaries[i].Source?.ToString();
-                if (source != null && source.Contains($"/{baseDir}/") &&
-                    !(baseDir == "Themes" && source.EndsWith("CommonStyles.xaml", StringComparison.OrdinalIgnoreCase)))
-                {
-                    dictionaries.RemoveAt(i);
-                }
-            }
-            dictionaries.Add(newResourceDictionary);
-        }
         #endregion
 
         #region Resource Management & Disposal
@@ -402,16 +371,13 @@ namespace PingTestTool
             if (e.ExceptionObject is Exception ex)
             {
                 MessageBox.Show(
-                    $"{FindResourceStringStatic("CriticalError")}: {ex.Message}",
-                    FindResourceStringStatic("ErrorCaption"),
+                    $"{ResourceHelper.FindResourceString("CriticalError")}: {ex.Message}",
+                    ResourceHelper.FindResourceString("ErrorCaption"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error
                 );
             }
         }
-
-        private static string FindResourceStringStatic(string resourceKey) =>
-            Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
 
         private void ShowMessage(
             string msg,

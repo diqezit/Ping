@@ -417,8 +417,8 @@ namespace PingTestTool
             if (IsTracing)
             {
                 showMessage(
-                    FindResourceStringStatic("TraceAlreadyRunning"),
-                    FindResourceStringStatic("WarningCaption"),
+                    ResourceHelper.FindResourceString("TraceAlreadyRunning"),
+                    ResourceHelper.FindResourceString("WarningCaption"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning
                 );
@@ -426,7 +426,7 @@ namespace PingTestTool
             }
 
             IsTracing = true;
-            updateStatus(FindResourceStringStatic("TraceStarted"), Colors.Green);
+            updateStatus(ResourceHelper.FindResourceString("TraceStarted"), Colors.Green);
 
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
@@ -442,8 +442,8 @@ namespace PingTestTool
             catch (Exception ex)
             {
                 showMessage(
-                    string.Format(FindResourceStringStatic("TraceError"), ex.Message),
-                    FindResourceStringStatic("ErrorCaption"),
+                    string.Format(ResourceHelper.FindResourceString("TraceError"), ex.Message),
+                    ResourceHelper.FindResourceString("ErrorCaption"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error
                 );
@@ -451,7 +451,7 @@ namespace PingTestTool
             finally
             {
                 IsTracing = false;
-                updateStatus(FindResourceStringStatic("TraceStopped"), Colors.Red);
+                updateStatus(ResourceHelper.FindResourceString("TraceStopped"), Colors.Red);
             }
         }
 

@@ -105,19 +105,16 @@ namespace PingTestTool
         private const int MIN_TIMEOUT = 100, MIN_PING_COUNT = 1, MAX_PING_COUNT = 1000;
 
         public static List<string> ValidateUrl(string url) =>
-            string.IsNullOrWhiteSpace(url) ? new() { FindResourceString("UrlEmptyError") } :
-            CyrillicRegex.IsMatch(url) ? new() { FindResourceString("UrlCyrillicError") } : new();
+            string.IsNullOrWhiteSpace(url) ? new() { ResourceHelper.FindResourceString("UrlEmptyError") } :
+            CyrillicRegex.IsMatch(url) ? new() { ResourceHelper.FindResourceString("UrlCyrillicError") } : new();
 
         public static List<string> ValidatePingCount(string pingCount) =>
             !int.TryParse(pingCount, out int count) || count < MIN_PING_COUNT || count > MAX_PING_COUNT ?
-                new() { string.Format(FindResourceString("PingCountRangeError"), MIN_PING_COUNT, MAX_PING_COUNT) } : new();
+                new() { string.Format(ResourceHelper.FindResourceString("PingCountRangeError"), MIN_PING_COUNT, MAX_PING_COUNT) } : new();
 
         public static List<string> ValidateTimeout(string timeout) =>
             !int.TryParse(timeout, out int time) || time < MIN_TIMEOUT ?
-                new() { string.Format(FindResourceString("TimeoutMinimumError"), MIN_TIMEOUT) } : new();
-
-        private static string FindResourceString(string resourceKey) =>
-             Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
+                new() { string.Format(ResourceHelper.FindResourceString("TimeoutMinimumError"), MIN_TIMEOUT) } : new();
     }
     #endregion
 
@@ -139,15 +136,13 @@ namespace PingTestTool
                 warning.Visibility = Visibility.Visible;
                 MessageBox.Show(
                     string.Join(Environment.NewLine, result.Errors),
-                    FindResourceString("InputErrorCaption"),
+                    ResourceHelper.FindResourceString("InputErrorCaption"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
             }
         }
-
-        private static string FindResourceString(string resourceKey) =>
-            Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
     }
+
     #endregion
 
     #region Main Window Event Handler
@@ -225,7 +220,7 @@ namespace PingTestTool
         {
             try
             {
-                if (_window.btnPing.Content.ToString() == FindResourceString(BTN_START_TEXT_KEY))
+                if (_window.btnPing.Content.ToString() == ResourceHelper.FindResourceString(BTN_START_TEXT_KEY))
                 {
                     _warningPresenter.HideAllWarnings();
                     var result = _validator.ValidateInput(_window.txtURL.Text, _window.txtPingCount.Text, _window.txtTimeout.Text);
@@ -240,13 +235,12 @@ namespace PingTestTool
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    $"{FindResourceString("GenericError")}: {ex.Message}",
-                    FindResourceString("ErrorCaption"),
+                    $"{ResourceHelper.FindResourceString("GenericError")}: {ex.Message}",
+                    ResourceHelper.FindResourceString("ErrorCaption"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
         }
-
         public void HandleStopButtonClick() => _cts?.Cancel();
 
         public async Task HandleShowGraphButtonClickAsync()
@@ -257,8 +251,8 @@ namespace PingTestTool
                 HandleGraphWindow(pingData.ToList());
             else
                 MessageBox.Show(
-                    FindResourceString(ERROR_NO_DATA_KEY),
-                    FindResourceString("ErrorCaption"),
+                    ResourceHelper.FindResourceString(ERROR_NO_DATA_KEY),
+                    ResourceHelper.FindResourceString("ErrorCaption"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
         }
@@ -502,8 +496,8 @@ namespace PingTestTool
     public class PingExecutor : IPingExecutor
     {
         public async Task<PingExecutionResult> ExecuteSinglePingAsync(
-            string url, int timeout, PingOptions options, byte[] buffer,
-            int currentPing, int totalPings, CancellationToken cancellationToken)
+    string url, int timeout, PingOptions options, byte[] buffer,
+    int currentPing, int totalPings, CancellationToken cancellationToken)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             using var ping = new Ping();
@@ -523,29 +517,25 @@ namespace PingTestTool
                 return CreateExceptionResult(url, ex, currentPing, totalPings, stopwatch.ElapsedMilliseconds);
             }
         }
-
         private PingExecutionResult CreateSuccessResult(string url, PingReply reply, int currentPing, int totalPings, long elapsed) =>
             new(true, (int)reply.RoundtripTime,
-                $"[{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] {FindResourceString("ReplyFrom")} {url}:\n" +
-                $"  {FindResourceString("Time")}: {reply.RoundtripTime,4} {FindResourceString("Ms")}\n" +
+                $"[{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] {ResourceHelper.FindResourceString("ReplyFrom")} {url}:\n" +
+                $"  {ResourceHelper.FindResourceString("Time")}: {reply.RoundtripTime,4} {ResourceHelper.FindResourceString("Ms")}\n" +
                 $"  TTL:  {reply.Options?.Ttl ?? 0}\n" +
-                $"  {FindResourceString("Size")}:{reply.Buffer?.Length ?? 0} {FindResourceString("Bytes")}",
+                $"  {ResourceHelper.FindResourceString("Size")}:{reply.Buffer?.Length ?? 0} {ResourceHelper.FindResourceString("Bytes")}",
                 elapsed);
 
         private PingExecutionResult CreateFailureResult(string url, PingReply reply, int currentPing, int totalPings, long elapsed) =>
             new(false, 0,
-                $"[{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] {FindResourceString("PingError")} {url}:\n" +
-                $"  {FindResourceString("Status")}: {reply.Status}",
+                $"[{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] {ResourceHelper.FindResourceString("PingError")} {url}:\n" +
+                $"  {ResourceHelper.FindResourceString("Status")}: {reply.Status}",
                 elapsed);
 
         private PingExecutionResult CreateExceptionResult(string url, PingException ex, int currentPing, int totalPings, long elapsed) =>
             new(false, 0,
-                $"[{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] {FindResourceString("CriticalPingError")} {url}:\n" +
+                $"[{DateTime.Now:HH:mm:ss}] [{currentPing}/{totalPings}] {ResourceHelper.FindResourceString("CriticalPingError")} {url}:\n" +
                 $"  {ex.Message}",
                 elapsed);
-
-        private static string FindResourceString(string resourceKey) =>
-            Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
     }
     #endregion
 
@@ -571,13 +561,13 @@ namespace PingTestTool
     {
         public void InitializeLogBuilder(StringBuilder sb, IPingConfiguration config, DateTime startTime) =>
             sb.AppendLine(PingServiceConstants.LOG_SEPARATOR)
-              .AppendLine($"  {FindResourceString("PingTest").ToUpper()}")
+              .AppendLine($"  {ResourceHelper.FindResourceString("PingTest").ToUpper()}")
               .AppendLine(PingServiceConstants.LOG_SEPARATOR)
-              .AppendLine($"{FindResourceString("StartTime")}:    {startTime:dd.MM.yyyy HH:mm:ss}")
-              .AppendLine($"{FindResourceString("Host")}:      {config.Url}")
-              .AppendLine($"{FindResourceString("PingCount")}:   {config.PingCount}")
-              .AppendLine($"{FindResourceString("Timeout")}:     {config.Timeout} {FindResourceString("Ms")}")
-              .AppendLine($"{FindResourceString("DontFragment")}: {(config.DontFragment ? FindResourceString("Yes") : FindResourceString("No"))}")
+              .AppendLine($"{ResourceHelper.FindResourceString("StartTime")}:    {startTime:dd.MM.yyyy HH:mm:ss}")
+              .AppendLine($"{ResourceHelper.FindResourceString("Host")}:      {config.Url}")
+              .AppendLine($"{ResourceHelper.FindResourceString("PingCount")}:   {config.PingCount}")
+              .AppendLine($"{ResourceHelper.FindResourceString("Timeout")}:     {config.Timeout} {ResourceHelper.FindResourceString("Ms")}")
+              .AppendLine($"{ResourceHelper.FindResourceString("DontFragment")}: {(config.DontFragment ? ResourceHelper.FindResourceString("Yes") : ResourceHelper.FindResourceString("No"))}")
               .AppendLine(PingServiceConstants.LOG_SEPARATOR)
               .AppendLine();
 
@@ -589,35 +579,33 @@ namespace PingTestTool
             var loss = total > 0 ? (fail * 100.0 / total).ToString("F2") : "0.00";
 
             sb.AppendLine(PingServiceConstants.LOG_SEPARATOR)
-              .AppendLine($"  {FindResourceString("TestingResults").ToUpper()}")
+              .AppendLine($"  {ResourceHelper.FindResourceString("TestingResults").ToUpper()}")
               .AppendLine(PingServiceConstants.LOG_SEPARATOR)
-              .AppendLine($"{FindResourceString("StartTime")}:    {startTime:dd.MM.yyyy HH:mm:ss}")
-              .AppendLine($"{FindResourceString("EndTime")}:      {endTime:dd.MM.yyyy HH:mm:ss}")
-              .AppendLine($"{FindResourceString("Duration")}:      {FormatExecutionTime(execTime)}")
+              .AppendLine($"{ResourceHelper.FindResourceString("StartTime")}:    {startTime:dd.MM.yyyy HH:mm:ss}")
+              .AppendLine($"{ResourceHelper.FindResourceString("EndTime")}:      {endTime:dd.MM.yyyy HH:mm:ss}")
+              .AppendLine($"{ResourceHelper.FindResourceString("Duration")}:      {FormatExecutionTime(execTime)}")
               .AppendLine(PingServiceConstants.LOG_MINI_SEPARATOR)
-              .AppendLine($"{FindResourceString("PacketStatistics")}:")
-              .AppendLine($"    {FindResourceString("PacketsSent")}: {total}")
-              .AppendLine($"    {FindResourceString("Successful")}:     {success}")
-              .AppendLine($"    {FindResourceString("Lost")}:       {fail} ({loss}%)")
+              .AppendLine($"{ResourceHelper.FindResourceString("PacketStatistics")}:")
+              .AppendLine($"    {ResourceHelper.FindResourceString("PacketsSent")}: {total}")
+              .AppendLine($"    {ResourceHelper.FindResourceString("Successful")}:     {success}")
+              .AppendLine($"    {ResourceHelper.FindResourceString("Lost")}:       {fail} ({loss}%)")
               .AppendLine(PingServiceConstants.LOG_MINI_SEPARATOR)
-              .AppendLine($"{FindResourceString("TimeStatistics")}:")
-              .AppendLine($"    {FindResourceString("Minimum")}:      {stats.Min} {FindResourceString("Ms")}")
-              .AppendLine($"    {FindResourceString("Maximum")}:      {stats.Max} {FindResourceString("Ms")}")
-              .AppendLine($"    {FindResourceString("Average")}:        {stats.Average:F2} {FindResourceString("Ms")}")
-              .AppendLine($"    {FindResourceString("Jitter")}:         {avgJitter:F2} {FindResourceString("Ms")}")
+              .AppendLine($"{ResourceHelper.FindResourceString("TimeStatistics")}:")
+              .AppendLine($"    {ResourceHelper.FindResourceString("Minimum")}:      {stats.Min} {ResourceHelper.FindResourceString("Ms")}")
+              .AppendLine($"    {ResourceHelper.FindResourceString("Maximum")}:      {stats.Max} {ResourceHelper.FindResourceString("Ms")}")
+              .AppendLine($"    {ResourceHelper.FindResourceString("Average")}:        {stats.Average:F2} {ResourceHelper.FindResourceString("Ms")}")
+              .AppendLine($"    {ResourceHelper.FindResourceString("Jitter")}:         {avgJitter:F2} {ResourceHelper.FindResourceString("Ms")}")
               .AppendLine(PingServiceConstants.LOG_SEPARATOR);
 
             return sb.ToString();
         }
 
         private static string FormatExecutionTime(TimeSpan t) =>
-            t.TotalHours >= 1 ? $"{t.TotalHours:F2} {FindResourceString("Hours")}" :
-            t.TotalMinutes >= 1 ? $"{t.TotalMinutes:F2} {FindResourceString("Minutes")}" :
-            $"{t.TotalSeconds:F2} {FindResourceString("Seconds")}";
-
-        private static string FindResourceString(string resourceKey) =>
-            Application.Current.FindResource(resourceKey) as string ?? $"[[{resourceKey}]]";
+            t.TotalHours >= 1 ? $"{t.TotalHours:F2} {ResourceHelper.FindResourceString("Hours")}" :
+            t.TotalMinutes >= 1 ? $"{t.TotalMinutes:F2} {ResourceHelper.FindResourceString("Minutes")}" :
+            $"{t.TotalSeconds:F2} {ResourceHelper.FindResourceString("Seconds")}";
     }
+
     #endregion
 
     #region Configuration & Results

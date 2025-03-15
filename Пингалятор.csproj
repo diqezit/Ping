@@ -216,6 +216,7 @@
     <Compile Include="Service\CompileService.cs" />
     <Compile Include="Service\GlobalUsings.cs" />
     <Compile Include="Service\RelayCommand.cs" />
+    <Compile Include="Service\ResourceHelper.cs" />
     <Compile Include="TraceRouteService.cs" />
     <Resource Include="Themes\CommonStyles.xaml">
       <SubType>Designer</SubType>
