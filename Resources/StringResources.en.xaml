@@ -1,0 +1,108 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:system="clr-namespace:System;assembly=mscorlib">
+
+    <system:String x:Key="BtnStartText">Start Test</system:String>
+    <system:String x:Key="BtnWaitText">Waiting...</system:String>
+
+    <system:String x:Key="ErrorNoGraphData">No ping data to display.</system:String>
+    <system:String x:Key="ErrorNoUrlForTrace">Please, enter URL for trace route.</system:String>
+    <system:String x:Key="UrlEmptyError">URL cannot be empty.</system:String>
+    <system:String x:Key="UrlInvalidError">Invalid URL or IP address.</system:String>
+    <system:String x:Key="PingCountRangeError">Packet count must be between {0} and {1}.</system:String>
+    <system:String x:Key="TimeoutMinimumError">Timeout must be at least {0} ms.</system:String>
+    <system:String x:Key="InputErrorCaption">Input Error</system:String>
+    <system:String x:Key="GenericError">An error occurred</system:String>
+    <system:String x:Key="ErrorCaption">Error</system:String>
+    <system:String x:Key="CriticalError">Critical Error</system:String>
+
+    <system:String x:Key="ReplyFrom">Reply from</system:String>
+    <system:String x:Key="Time">Time</system:String>
+    <system:String x:Key="Ms">ms</system:String>
+    <system:String x:Key="Size">Size</system:String>
+    <system:String x:Key="Bytes">bytes</system:String>
+    <system:String x:Key="PingError">Ping error</system:String>
+    <system:String x:Key="Status">Status</system:String>
+    <system:String x:Key="CriticalPingError">Critical ping error</system:String>
+
+    <system:String x:Key="PingTest">PING TEST</system:String>
+    <system:String x:Key="StartTime">Start Time</system:String>
+    <system:String x:Key="Host">Host</system:String>
+    <system:String x:Key="PingCount">Ping Count</system:String>
+    <system:String x:Key="Timeout">Timeout</system:String>
+    <system:String x:Key="DontFragment">Don't Fragment</system:String>
+    <system:String x:Key="Yes">Yes</system:String>
+    <system:String x:Key="No">No</system:String>
+
+    <system:String x:Key="TestingResults">TESTING RESULTS</system:String>
+    <system:String x:Key="EndTime">End Time</system:String>
+    <system:String x:Key="Duration">Duration</system:String>
+    <system:String x:Key="PacketStatistics">Packet Statistics</system:String>
+    <system:String x:Key="PacketsSent">Packets Sent</system:String>
+    <system:String x:Key="Successful">Successful</system:String>
+    <system:String x:Key="Lost">Lost</system:String>
+    <system:String x:Key="TimeStatistics">Time Statistics</system:String>
+    <system:String x:Key="Minimum">Minimum</system:String>
+    <system:String x:Key="Maximum">Maximum</system:String>
+    <system:String x:Key="Average">Average</system:String>
+    <system:String x:Key="Jitter">Jitter</system:String>
+    <system:String x:Key="Hours">hours</system:String>
+    <system:String x:Key="Minutes">minutes</system:String>
+    <system:String x:Key="Seconds">seconds</system:String>
+
+    <system:String x:Key="WindowTitle">PingTestTool Utility</system:String>
+    <system:String x:Key="GraphWindowTitle">Ping Graph</system:String>
+    <system:String x:Key="URLLabel">URL:</system:String>
+    <system:String x:Key="PingCountLabel">Ping Count:</system:String>
+    <system:String x:Key="TimeoutLabel">Timeout (ms):</system:String>
+    <system:String x:Key="StartTestButton">Start Test</system:String>
+    <system:String x:Key="StopButton">Stop</system:String>
+    <system:String x:Key="TraceRouteButton">Trace Route</system:String>
+    <system:String x:Key="GraphButton">Graph</system:String>
+    <system:String x:Key="ExportButton">Export</system:String>
+
+    <system:String x:Key="SettingsHeader">Settings</system:String>
+    <system:String x:Key="ThemeHeader">Theme</system:String>
+    <system:String x:Key="DarkThemeHeader">Dark</system:String>
+    <system:String x:Key="LightThemeHeader">Light</system:String>
+    <system:String x:Key="LanguageHeader">Language</system:String>
+    <system:String x:Key="SwitchThemeHeader">Switch Theme</system:String>
+
+    <system:String x:Key="PingTabHeader">Ping</system:String>
+    <system:String x:Key="TraceRouteTabHeader">Trace Route</system:String>
+
+    <system:String x:Key="NrColumnHeader">Nr</system:String>
+    <system:String x:Key="TraceWindowTitle">Trace Route</system:String>
+    <system:String x:Key="IPAddressColumnHeader">IP Address</system:String>
+    <system:String x:Key="DomainNameColumnHeader">Domain Name</system:String>
+    <system:String x:Key="LossColumnHeader">Loss</system:String>
+    <system:String x:Key="SentColumnHeader">Sent</system:String>
+    <system:String x:Key="ReceivedColumnHeader">Recv</system:String>
+    <system:String x:Key="BestColumnHeader">Best</system:String>
+    <system:String x:Key="LastColumnHeader">Last</system:String>
+    <system:String x:Key="AverageColumnHeader">Avrg</system:String>
+    <system:String x:Key="WorstColumnHeader">Wrst</system:String>
+
+    <system:String x:Key="StartTraceButton">Start Trace</system:String>
+    <system:String x:Key="StopTraceButton">Stop Trace</system:String>
+    <system:String x:Key="ClearResultsButton">Clear Results</system:String>
+    <system:String x:Key="SaveResultsButton">Save Results</system:String>
+
+    <system:String x:Key="TraceAlreadyRunning">Trace is already running.</system:String>
+    <system:String x:Key="WarningCaption">Warning</system:String>
+    <system:String x:Key="TraceStarted">Tracing started...</system:String>
+    <system:String x:Key="TraceError">Trace error: {0}</system:String>
+    <system:String x:Key="TraceStopped">Tracing stopped.</system:String>
+    <system:String x:Key="Stopping">Stopping...</system:String>
+
+    <system:String x:Key="ClearPingResultsConfirmation">Clear ping results?</system:String>
+    <system:String x:Key="ConfirmationCaption">Confirmation</system:String>
+
+    <system:String x:Key="SpecifyUrl">Please specify host address.</system:String>
+    <system:String x:Key="NoResults">No results to save.</system:String>
+    <system:String x:Key="Saved">Results saved successfully.</system:String>
+    <system:String x:Key="SuccessCaption">Success</system:String>
+    <system:String x:Key="SaveError">Error saving file</system:String>
+
+</ResourceDictionary>

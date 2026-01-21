@@ -1,0 +1,108 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:system="clr-namespace:System;assembly=mscorlib">
+
+    <system:String x:Key="BtnStartText">Запустить тест</system:String>
+    <system:String x:Key="BtnWaitText">Ожидаем...</system:String>
+
+    <system:String x:Key="ErrorNoGraphData">Нет данных пинга для отображения.</system:String>
+    <system:String x:Key="ErrorNoUrlForTrace">Пожалуйста, укажите URL для трассировки.</system:String>
+    <system:String x:Key="UrlEmptyError">URL не может быть пустым.</system:String>
+    <system:String x:Key="UrlInvalidError">Неверный URL или IP-адрес.</system:String>
+    <system:String x:Key="PingCountRangeError">Количество пакетов должно быть между {0} и {1}.</system:String>
+    <system:String x:Key="TimeoutMinimumError">Таймаут должен быть не менее {0} мс.</system:String>
+    <system:String x:Key="InputErrorCaption">Ошибка ввода</system:String>
+    <system:String x:Key="GenericError">Произошла ошибка</system:String>
+    <system:String x:Key="ErrorCaption">Ошибка</system:String>
+    <system:String x:Key="CriticalError">Критическая ошибка</system:String>
+
+    <system:String x:Key="ReplyFrom">Ответ от</system:String>
+    <system:String x:Key="Time">Время</system:String>
+    <system:String x:Key="Ms">мс</system:String>
+    <system:String x:Key="Size">Размер</system:String>
+    <system:String x:Key="Bytes">байт</system:String>
+    <system:String x:Key="PingError">Ошибка пинга</system:String>
+    <system:String x:Key="Status">Статус</system:String>
+    <system:String x:Key="CriticalPingError">Критическая ошибка пинга</system:String>
+
+    <system:String x:Key="PingTest">ТЕСТ PING</system:String>
+    <system:String x:Key="StartTime">Время начала</system:String>
+    <system:String x:Key="Host">Хост</system:String>
+    <system:String x:Key="PingCount">Кол-во пингов</system:String>
+    <system:String x:Key="Timeout">Таймаут</system:String>
+    <system:String x:Key="DontFragment">Не фрагментировать</system:String>
+    <system:String x:Key="Yes">Да</system:String>
+    <system:String x:Key="No">Нет</system:String>
+
+    <system:String x:Key="TestingResults">ИТОГИ ТЕСТИРОВАНИЯ</system:String>
+    <system:String x:Key="EndTime">Время конца</system:String>
+    <system:String x:Key="Duration">Длительность</system:String>
+    <system:String x:Key="PacketStatistics">Статистика пакетов</system:String>
+    <system:String x:Key="PacketsSent">Всего отправлено</system:String>
+    <system:String x:Key="Successful">Успешно</system:String>
+    <system:String x:Key="Lost">Потеряно</system:String>
+    <system:String x:Key="TimeStatistics">Статистика времени</system:String>
+    <system:String x:Key="Minimum">Минимальное</system:String>
+    <system:String x:Key="Maximum">Максимальное</system:String>
+    <system:String x:Key="Average">Среднее</system:String>
+    <system:String x:Key="Jitter">Джиттер</system:String>
+    <system:String x:Key="Hours">часов</system:String>
+    <system:String x:Key="Minutes">минут</system:String>
+    <system:String x:Key="Seconds">секунд</system:String>
+
+    <system:String x:Key="WindowTitle">Утилита PingTestTool</system:String>
+    <system:String x:Key="GraphWindowTitle">График пинга</system:String>
+    <system:String x:Key="URLLabel">URL:</system:String>
+    <system:String x:Key="PingCountLabel">К-во пакетов:</system:String>
+    <system:String x:Key="TimeoutLabel">Таймаут (мс):</system:String>
+    <system:String x:Key="StartTestButton">Запустить тест</system:String>
+    <system:String x:Key="StopButton">Стоп</system:String>
+    <system:String x:Key="TraceRouteButton">Трассировка</system:String>
+    <system:String x:Key="GraphButton">График</system:String>
+    <system:String x:Key="ExportButton">Экспорт</system:String>
+
+    <system:String x:Key="SettingsHeader">Настройки</system:String>
+    <system:String x:Key="ThemeHeader">Тема</system:String>
+    <system:String x:Key="DarkThemeHeader">Тёмная тема</system:String>
+    <system:String x:Key="LightThemeHeader">Светлая тема</system:String>
+    <system:String x:Key="LanguageHeader">Язык</system:String>
+    <system:String x:Key="SwitchThemeHeader">Переключить тему</system:String>
+
+    <system:String x:Key="PingTabHeader">Пинг</system:String>
+    <system:String x:Key="TraceRouteTabHeader">Трассировка</system:String>
+
+    <system:String x:Key="NrColumnHeader">№</system:String>
+    <system:String x:Key="TraceWindowTitle">Трассировка маршрута</system:String>
+    <system:String x:Key="IPAddressColumnHeader">IP Адрес</system:String>
+    <system:String x:Key="DomainNameColumnHeader">Доменное имя</system:String>
+    <system:String x:Key="LossColumnHeader">Потери</system:String>
+    <system:String x:Key="SentColumnHeader">Отправлено</system:String>
+    <system:String x:Key="ReceivedColumnHeader">Получено</system:String>
+    <system:String x:Key="BestColumnHeader">Лучший</system:String>
+    <system:String x:Key="LastColumnHeader">Последний</system:String>
+    <system:String x:Key="AverageColumnHeader">Средний</system:String>
+    <system:String x:Key="WorstColumnHeader">Худший</system:String>
+
+    <system:String x:Key="StartTraceButton">Начать трассировку</system:String>
+    <system:String x:Key="StopTraceButton">Остановить трассировку</system:String>
+    <system:String x:Key="ClearResultsButton">Очистить результаты</system:String>
+    <system:String x:Key="SaveResultsButton">Сохранить результаты</system:String>
+
+    <system:String x:Key="TraceAlreadyRunning">Трассировка уже запущена.</system:String>
+    <system:String x:Key="WarningCaption">Предупреждение</system:String>
+    <system:String x:Key="TraceStarted">Трассировка запущена...</system:String>
+    <system:String x:Key="TraceError">Ошибка трассировки: {0}</system:String>
+    <system:String x:Key="TraceStopped">Трассировка остановлена.</system:String>
+    <system:String x:Key="Stopping">Остановка...</system:String>
+
+    <system:String x:Key="ClearPingResultsConfirmation">Очистить результаты пинга?</system:String>
+    <system:String x:Key="ConfirmationCaption">Подтверждение</system:String>
+
+    <system:String x:Key="SpecifyUrl">Пожалуйста, укажите адрес хоста.</system:String>
+    <system:String x:Key="NoResults">Нет результатов для сохранения.</system:String>
+    <system:String x:Key="Saved">Результаты успешно сохранены.</system:String>
+    <system:String x:Key="SuccessCaption">Успех</system:String>
+    <system:String x:Key="SaveError">Ошибка сохранения файла</system:String>
+
+</ResourceDictionary>

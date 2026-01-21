@@ -1,0 +1,21 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="BgPrimary" Color="#1E1E1E"/>
+    <SolidColorBrush x:Key="BgSecondary" Color="#252526"/>
+    <SolidColorBrush x:Key="BgHover" Color="#3E3E42"/>
+    <SolidColorBrush x:Key="BgInput" Color="#333337"/>
+    <SolidColorBrush x:Key="BgAccent" Color="#0078D4"/>
+    <SolidColorBrush x:Key="BgAccentHover" Color="#1C97EA"/>
+    <SolidColorBrush x:Key="BgAccentPressed" Color="#0062A3"/>
+    <SolidColorBrush x:Key="BgDisabled" Color="#2D2D30"/>
+    <SolidColorBrush x:Key="FgPrimary" Color="#F1F1F1"/>
+    <SolidColorBrush x:Key="FgSecondary" Color="#CCCCCC"/>
+    <SolidColorBrush x:Key="FgAccent" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="FgDisabled" Color="#656565"/>
+    <SolidColorBrush x:Key="Border" Color="#3F3F46"/>
+    <SolidColorBrush x:Key="RouteLine" Color="#646464"/>
+    <SolidColorBrush x:Key="RouteText" Color="#C8C8C8"/>
+    <Color x:Key="RouteGoodColor">#1E90FF</Color>
+    <Color x:Key="RouteBadColor">#FF4444</Color>
+</ResourceDictionary>

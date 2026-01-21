@@ -1,0 +1,93 @@
+﻿################################################################################
+# Ignore temporary and unnecessary Visual Studio files
+################################################################################
+
+# Visual Studio folder
+.vs/
+
+# User-specific files
+*.user
+*.suo
+
+# Build folders
+bin/
+obj/
+
+# Cache and backup files
+*.log
+*.temp
+*.cache
+*.bak
+*.pid
+*.swp
+
+# NuGet packages and config
+packages/
+*.nupkg
+
+# Configuration files
+appsettings.Development.json
+launchSettings.json
+
+# Temporary files
+Thumbs.db
+desktop.ini
+~$*
+
+# System files
+.DS_Store
+
+# Ignore upgrade and temporary project files
+UpgradeLog.htm
+*_wpftmp.csproj
+
+# Ignore editor backup files
+*.orig
+*.rej
+
+# Ignore Visual Studio Code settings folder
+.vscode/
+
+# Ignore Rider IDE files
+.idea/
+
+# Ignore test result folders
+TestResults/
+
+# Ignore Resharper files
+_ReSharper*/
+
+# Ignore dotCover files
+*.dotCover
+
+# Ignore coverage reports
+coverage/
+
+# Ignore logs folder
+logs/
+
+# Ignore generated files
+Generated/
+
+# Ignore local database files
+*.mdf
+*.ldf
+
+# Ignore publish output
+publish/
+
+# Ignore npm/node modules (if applicable)
+node_modules/
+
+# Ignore Yarn files (if applicable)
+.yarn/
+.yarnrc.yml
+
+# Ignore environment files
+.env
+.env.local
+.env.*.local
+
+# Ignore macOS system files
+.AppleDouble
+.LSOverride
