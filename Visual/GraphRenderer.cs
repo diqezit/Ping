@@ -1,9 +1,8 @@
 ﻿namespace PingTestTool.Visual;
 
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public sealed class GraphRenderer(
     Canvas canvas,
-    Func<string, Brush?> findBrush,
+    Func<string, IBrush?> findBrush,
     Action<string, string, string, string> onStats)
 {
     const double ML = 45, MR = 15, MT = 15, MB = 25, R = 3;
@@ -43,8 +42,7 @@ public sealed class GraphRenderer(
 
     public void AddPoint(int v)
     {
-        if (v <= 0)
-            return;
+        if (v <= 0) return;
         _q.Enqueue(v);
         Trim();
         Draw();
@@ -58,7 +56,7 @@ public sealed class GraphRenderer(
 
     void Draw()
     {
-        double w = canvas.ActualWidth, h = canvas.ActualHeight;
+        double w = canvas.Bounds.Width, h = canvas.Bounds.Height;
         if (w < 80 || h < 50)
         {
             onStats("0", "0", "0", "0");
@@ -66,10 +64,9 @@ public sealed class GraphRenderer(
             return;
         }
 
-        var (lineBrush, textBrush, gridBrush) = (
-            findBrush("BgAccent") ?? Brushes.DodgerBlue,
-            findBrush("FgPrimary") ?? Brushes.White,
-            findBrush("Border") ?? Brushes.Gray);
+        var lineBrush = findBrush("BgAccent") ?? Brushes.DodgerBlue;
+        var textBrush = findBrush("FgPrimary") ?? Brushes.White;
+        var gridBrush = findBrush("Border") ?? Brushes.Gray;
 
         double pw = w - ML - MR, ph = h - MT - MB;
 
@@ -106,11 +103,9 @@ public sealed class GraphRenderer(
         return (min, max, (double)sum / arr.Length, cur);
     }
 
-    void EnsureGrid(Brush b)
+    void EnsureGrid(IBrush b)
     {
-        if (_grid[0] is not null)
-            return;
-
+        if (_grid[0] is not null) return;
         for (int i = 0; i < GridCount; i++)
         {
             _grid[i] = new Line { Stroke = b, StrokeThickness = 0.5, Opacity = 0.3 };
@@ -124,16 +119,15 @@ public sealed class GraphRenderer(
         {
             double y = MT + ph * i / (GridCount - 1);
             var line = _grid[i];
-            (line.X1, line.Y1, line.X2, line.Y2) = (ML, y, ML + pw, y);
-            line.Visibility = Visibility.Visible;
+            line.StartPoint = new Point(ML, y);
+            line.EndPoint = new Point(ML + pw, y);
+            line.IsVisible = true;
         }
     }
 
-    void EnsureYAxis(Brush b)
+    void EnsureYAxis(IBrush b)
     {
-        if (_yAxis[0] is not null)
-            return;
-
+        if (_yAxis[0] is not null) return;
         for (int i = 0; i < GridCount; i++)
         {
             _yAxis[i] = new TextBlock { Foreground = b, FontSize = 10 };
@@ -150,32 +144,34 @@ public sealed class GraphRenderer(
 
             var t = _yAxis[i];
             t.Text = $"{val}";
-            t.Visibility = Visibility.Visible;
-            t.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            t.IsVisible = true;
+            t.Measure(Size.Infinity);
             Canvas.SetLeft(t, ML - t.DesiredSize.Width - 4);
             Canvas.SetTop(t, y - t.DesiredSize.Height / 2);
         }
     }
 
-    void UpdateChart(int[] arr, double pw, double ph, int yMax, Brush b)
+    void UpdateChart(int[] arr, double pw, double ph, int yMax, IBrush b)
     {
         if (_line is null)
         {
-            _line = new Polyline { StrokeThickness = 2, StrokeLineJoin = PenLineJoin.Round };
+            _line = new Polyline { StrokeThickness = 2, StrokeJoin = PenLineJoin.Round };
             canvas.Children.Add(_line);
         }
 
         _line.Stroke = b;
-        _line.Visibility = Visibility.Visible;
-        _line.Points.Clear();
+        _line.IsVisible = true;
+        _line.Points = [];
 
         int last = arr.Length - 1;
+        var points = new List<Point>(arr.Length);
         for (int i = 0; i < arr.Length; i++)
         {
             double x = ML + (last > 0 ? (double)i / last * pw : pw / 2);
             double y = MT + ph * (1 - (double)arr[i] / yMax);
-            _line.Points.Add(new Point(x, y));
+            points.Add(new Point(x, y));
         }
+        _line.Points = [.. points];
 
         while (_dots.Count > arr.Length)
         {
@@ -193,9 +189,9 @@ public sealed class GraphRenderer(
         for (int i = 0; i < arr.Length; i++)
         {
             var dot = _dots[i];
-            var pt = _line.Points[i];
+            var pt = points[i];
             dot.Fill = b;
-            dot.Visibility = Visibility.Visible;
+            dot.IsVisible = true;
             Canvas.SetLeft(dot, pt.X - R);
             Canvas.SetTop(dot, pt.Y - R);
         }
@@ -203,28 +199,20 @@ public sealed class GraphRenderer(
 
     void HideChart()
     {
-        _line?.Visibility = Visibility.Collapsed;
-
-        foreach (var dot in _dots)
-            dot.Visibility = Visibility.Collapsed;
-
+        _line?.IsVisible = false;
+        foreach (var dot in _dots) dot.IsVisible = false;
         for (int i = 0; i < GridCount; i++)
-            _yAxis[i]?.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
+            _yAxis[i]?.IsVisible = false;
     }
 
     void SetVisibility(bool visible)
     {
-        var v = visible ? Visibility.Visible : Visibility.Collapsed;
-
-        _line?.SetValue(UIElement.VisibilityProperty, v);
-
-        foreach (var dot in _dots)
-            dot.Visibility = v;
-
+        _line?.IsVisible = visible;
+        foreach (var dot in _dots) dot.IsVisible = visible;
         for (int i = 0; i < GridCount; i++)
         {
-            _grid[i]?.SetValue(UIElement.VisibilityProperty, v);
-            _yAxis[i]?.SetValue(UIElement.VisibilityProperty, v);
+            _grid[i]?.IsVisible = visible;
+            _yAxis[i]?.IsVisible = visible;
         }
     }
 }

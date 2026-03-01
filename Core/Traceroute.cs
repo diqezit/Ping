@@ -1,6 +1,4 @@
-﻿using SysPing = System.Net.NetworkInformation.Ping;
-
-namespace PingTestTool.Core;
+﻿namespace PingTestTool.Core;
 
 public readonly record struct HopStats(long Min, long Max, double Avg, long Last, double Loss);
 
@@ -18,9 +16,7 @@ public sealed class HopData
         lock (_lk)
         {
             _sent++;
-            if (!ok)
-                return;
-
+            if (!ok) return;
             _recv++;
             ms = Math.Max(ms, 0);
             _last = ms;
@@ -97,9 +93,7 @@ public sealed class TraceResult : INotifyPropertyChanged
 
     void Set<T>(ref T dst, T val, [CallerMemberName] string? name = null)
     {
-        if (EqualityComparer<T>.Default.Equals(dst, val))
-            return;
-
+        if (EqualityComparer<T>.Default.Equals(dst, val)) return;
         dst = val;
         PropertyChanged?.Invoke(this, new(name));
     }
@@ -160,17 +154,16 @@ public sealed class TraceManager : IDisposable
 
     public async Task StartTraceAsync(
         Action<string, Color> updStatus,
-        Action<string, string, MessageBoxButton, MessageBoxImage> showMsg)
+        Action<string, string> showMsg)
     {
         if (IsTracing)
         {
-            showMsg(Res("TraceAlreadyRunning"), Res("WarningCaption"),
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            showMsg(S("TraceAlreadyRunning"), S("WarningCaption"));
             return;
         }
 
         IsTracing = true;
-        updStatus(Res("TraceStarted"), Colors.Green);
+        updStatus(S("TraceStarted"), Colors.Green);
         _cts?.Dispose();
         _cts = new();
 
@@ -181,13 +174,12 @@ public sealed class TraceManager : IDisposable
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            showMsg(string.Format(Res("TraceError"), ex.Message), Res("ErrorCaption"),
-                MessageBoxButton.OK, MessageBoxImage.Error);
+            showMsg(string.Format(S("TraceError"), ex.Message), S("ErrorCaption"));
         }
         finally
         {
             IsTracing = false;
-            updStatus(Res("TraceStopped"), Colors.Red);
+            updStatus(S("TraceStopped"), Colors.Red);
         }
     }
 
@@ -310,21 +302,18 @@ public sealed class TraceManager : IDisposable
 
     void UpdUi(int ttl, string ip, string dom, HopData hop, bool force)
     {
-        if ((uint)ttl > MaxTtl)
-            return;
+        if ((uint)ttl > MaxTtl) return;
 
         if (!force)
         {
             long now = Stopwatch.GetTimestamp();
-            if (now < _uiNext[ttl])
-                return;
+            if (now < _uiNext[ttl]) return;
             _uiNext[ttl] = now + UiUpdTicks;
         }
 
-        Application.Current.Dispatcher.BeginInvoke(() =>
+        Dispatcher.UIThread.Post(() =>
         {
-            if (_disposed)
-                return;
+            if (_disposed) return;
 
             var r = _res[ttl];
             if (r is null)
@@ -372,9 +361,7 @@ public sealed class TraceManager : IDisposable
 
     void StartDns(string ip, CancellationToken ct)
     {
-        if (_disposed || !_dnsRun.TryAdd(ip, 0))
-            return;
-
+        if (_disposed || !_dnsRun.TryAdd(ip, 0)) return;
         _ = ResolveDnsAsync(ip, ct);
     }
 
@@ -402,32 +389,23 @@ public sealed class TraceManager : IDisposable
                         }
                     }
                 }
-                finally
-                {
-                    _dnsSem.Release();
-                }
+                finally { _dnsSem.Release(); }
             }
         }
         catch { }
-        finally
-        {
-            _dnsRun.TryRemove(ip, out _);
-        }
+        finally { _dnsRun.TryRemove(ip, out _); }
 
         _dnsCache.Set(ip, dom, dom == Unresolved ? DnsBadOpt : DnsOkOpt);
 
-        if (_disposed)
-            return;
+        if (_disposed) return;
 
-        await Application.Current.Dispatcher.InvokeAsync(() =>
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            if (_disposed)
-                return;
-
+            if (_disposed) return;
             foreach (var r in TraceResults)
                 if (r.IPAddress == ip)
                     r.DomainName = dom;
-        }, DispatcherPriority.Background, ct);
+        }, DispatcherPriority.Background);
     }
 
     async Task<(PingReply? Rep, int Ms)> SendPing(
@@ -453,20 +431,16 @@ public sealed class TraceManager : IDisposable
         (int)((Stopwatch.GetTimestamp() - t0) * 1000 / Stopwatch.Frequency);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static string Res(string k) => ResourceHelper.FindResourceString(k);
+    static string S(string k) => Strings.Get(k);
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
+        if (_disposed) return;
         _disposed = true;
-
         _cts?.Cancel();
         _cts?.Dispose();
-
         for (int i = 1; i <= MaxTtl; i++)
             try { _ping[i]?.Dispose(); } catch { }
-
         _dnsCache.Dispose();
         _dnsSem.Dispose();
         GC.SuppressFinalize(this);

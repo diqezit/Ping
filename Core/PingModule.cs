@@ -1,6 +1,4 @@
-﻿using SysPing = System.Net.NetworkInformation.Ping;
-
-namespace PingTestTool.Core;
+﻿namespace PingTestTool.Core;
 
 public readonly record struct PingConfiguration(
     string Url,
@@ -25,8 +23,7 @@ public sealed class PingService : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
+        if (_disposed) return;
         _disposed = true;
         GC.SuppressFinalize(this);
     }
@@ -74,17 +71,17 @@ public sealed class PingService : IDisposable
 
                     OnRoundtripTimeAdded?.Invoke(now, rtt);
                     OnPingResult?.Invoke(
-                        $"[{now:HH:mm:ss}] [{i + 1}/{cfg.PingCount}] {Res("ReplyFrom")} {cfg.Url}:\n" +
-                        $"  {Res("Time")}: {rep.RoundtripTime,4} {Res("Ms")}\n" +
+                        $"[{now:HH:mm:ss}] [{i + 1}/{cfg.PingCount}] {S("ReplyFrom")} {cfg.Url}:\n" +
+                        $"  {S("Time")}: {rep.RoundtripTime,4} {S("Ms")}\n" +
                         $"  TTL:  {rep.Options?.Ttl ?? 0}\n" +
-                        $"  {Res("Size")}: {rep.Buffer?.Length ?? 0} {Res("Bytes")}\n");
+                        $"  {S("Size")}: {rep.Buffer?.Length ?? 0} {S("Bytes")}\n");
                 }
                 else
                 {
                     fail++;
                     OnPingResult?.Invoke(
-                        $"[{DateTime.Now:HH:mm:ss}] [{i + 1}/{cfg.PingCount}] {Res("PingError")} {cfg.Url}:\n" +
-                        $"  {Res("Status")}: {rep.Status}\n");
+                        $"[{DateTime.Now:HH:mm:ss}] [{i + 1}/{cfg.PingCount}] {S("PingError")} {cfg.Url}:\n" +
+                        $"  {S("Status")}: {rep.Status}\n");
                 }
 
                 OnProgressUpdate?.Invoke(i + 1, cfg.PingCount);
@@ -97,7 +94,7 @@ public sealed class PingService : IDisposable
             {
                 fail++;
                 OnPingResult?.Invoke(
-                    $"[{DateTime.Now:HH:mm:ss}] [{i + 1}/{cfg.PingCount}] {Res("CriticalPingError")}: {ex.Message}\n");
+                    $"[{DateTime.Now:HH:mm:ss}] [{i + 1}/{cfg.PingCount}] {S("CriticalPingError")}: {ex.Message}\n");
                 OnProgressUpdate?.Invoke(i + 1, cfg.PingCount);
             }
         }
@@ -107,12 +104,12 @@ public sealed class PingService : IDisposable
 
     void EmitHeader(PingConfiguration cfg, DateTime t0) =>
         OnPingResult?.Invoke(
-            $"{Sep}\n  {Res("PingTest")}\n{Sep}\n" +
-            $"{Res("StartTime")}:    {t0.ToString(DtFmt)}\n" +
-            $"{Res("Host")}:      {cfg.Url}\n" +
-            $"{Res("PingCount")}:   {cfg.PingCount}\n" +
-            $"{Res("Timeout")}:     {cfg.Timeout} {Res("Ms")}\n" +
-            $"{Res("DontFragment")}: {(cfg.DontFragment ? Res("Yes") : Res("No"))}\n{Sep}\n");
+            $"{Sep}\n  {S("PingTest")}\n{Sep}\n" +
+            $"{S("StartTime")}:    {t0.ToString(DtFmt)}\n" +
+            $"{S("Host")}:      {cfg.Url}\n" +
+            $"{S("PingCount")}:   {cfg.PingCount}\n" +
+            $"{S("Timeout")}:     {cfg.Timeout} {S("Ms")}\n" +
+            $"{S("DontFragment")}: {(cfg.DontFragment ? S("Yes") : S("No"))}\n{Sep}\n");
 
     void EmitFooter(DateTime t0, int ok, int fail)
     {
@@ -124,44 +121,40 @@ public sealed class PingService : IDisposable
         string loss = total > 0 ? $"{fail * 100.0 / total:F2}" : "0.00";
 
         OnPingResult?.Invoke(
-            $"\n{Sep}\n  {Res("TestingResults")}\n{Sep}\n" +
-            $"{Res("StartTime")}:    {t0.ToString(DtFmt)}\n" +
-            $"{Res("EndTime")}:      {t1.ToString(DtFmt)}\n" +
-            $"{Res("Duration")}:      {FmtDur(dur)}\n" +
-            $"{SepMini}\n{Res("PacketStatistics")}:\n" +
-            $"    {Res("PacketsSent")}: {total}\n" +
-            $"    {Res("Successful")}:     {ok}\n" +
-            $"    {Res("Lost")}:       {fail} ({loss}%)\n" +
-            $"{SepMini}\n{Res("TimeStatistics")}:\n" +
-            $"    {Res("Minimum")}:      {min} {Res("Ms")}\n" +
-            $"    {Res("Maximum")}:      {max} {Res("Ms")}\n" +
-            $"    {Res("Average")}:        {avg:F2} {Res("Ms")}\n" +
-            $"    {Res("Jitter")}:         {jitter:F2} {Res("Ms")}\n{Sep}\n");
+            $"\n{Sep}\n  {S("TestingResults")}\n{Sep}\n" +
+            $"{S("StartTime")}:    {t0.ToString(DtFmt)}\n" +
+            $"{S("EndTime")}:      {t1.ToString(DtFmt)}\n" +
+            $"{S("Duration")}:      {FmtDur(dur)}\n" +
+            $"{SepMini}\n{S("PacketStatistics")}:\n" +
+            $"    {S("PacketsSent")}: {total}\n" +
+            $"    {S("Successful")}:     {ok}\n" +
+            $"    {S("Lost")}:       {fail} ({loss}%)\n" +
+            $"{SepMini}\n{S("TimeStatistics")}:\n" +
+            $"    {S("Minimum")}:      {min} {S("Ms")}\n" +
+            $"    {S("Maximum")}:      {max} {S("Ms")}\n" +
+            $"    {S("Average")}:        {avg:F2} {S("Ms")}\n" +
+            $"    {S("Jitter")}:         {jitter:F2} {S("Ms")}\n{Sep}\n");
     }
 
     static string FmtDur(TimeSpan t) => t.TotalHours >= 1
-        ? $"{t.TotalHours:F2} {Res("Hours")}"
+        ? $"{t.TotalHours:F2} {S("Hours")}"
         : t.TotalMinutes >= 1
-            ? $"{t.TotalMinutes:F2} {Res("Minutes")}"
-            : $"{t.TotalSeconds:F2} {Res("Seconds")}";
+            ? $"{t.TotalMinutes:F2} {S("Minutes")}"
+            : $"{t.TotalSeconds:F2} {S("Seconds")}";
 
     (int Min, int Max, double Avg) CalcStats()
     {
         lock (_lk)
         {
-            if (_data.Count == 0)
-                return (0, 0, 0);
-
+            if (_data.Count == 0) return (0, 0, 0);
             int min = int.MaxValue, max = 0;
             long sum = 0;
-
             foreach (var (_, rtt) in _data)
             {
                 min = Math.Min(min, rtt);
                 max = Math.Max(max, rtt);
                 sum += rtt;
             }
-
             return (min, max, (double)sum / _data.Count);
         }
     }
@@ -170,13 +163,10 @@ public sealed class PingService : IDisposable
     {
         lock (_lk)
         {
-            if (_data.Count <= 1)
-                return 0;
-
+            if (_data.Count <= 1) return 0;
             double sum = 0;
             for (int i = 1; i < _data.Count; i++)
                 sum += Math.Abs(_data[i].Rtt - _data[i - 1].Rtt);
-
             return Math.Round(sum / (_data.Count - 1), 2);
         }
     }
@@ -186,5 +176,5 @@ public sealed class PingService : IDisposable
         (int)((Stopwatch.GetTimestamp() - t0) * 1000 / Stopwatch.Frequency);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static string Res(string k) => ResourceHelper.FindResourceString(k);
+    static string S(string k) => Strings.Get(k);
 }

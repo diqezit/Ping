@@ -1,0 +1,134 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PingTestTool.MainWindow"
+        Title="PingTestTool"
+        Width="800" Height="620"
+        MinWidth="640" MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+
+  <Grid Margin="12">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <Menu Grid.Row="0" Margin="0,0,0,8">
+      <MenuItem Header="Settings">
+        <MenuItem Header="Theme">
+          <MenuItem Header="Dark" Click="Dark_Click"/>
+          <MenuItem Header="Light" Click="Light_Click"/>
+        </MenuItem>
+        <MenuItem Header="Language">
+          <MenuItem Header="Русский" Click="Ru_Click"/>
+          <MenuItem Header="English" Click="En_Click"/>
+        </MenuItem>
+      </MenuItem>
+    </Menu>
+
+    <TabControl Grid.Row="1">
+
+      <TabItem x:Name="tabPing" Header="Ping">
+        <Grid Margin="0,12,0,0">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+
+          <Grid Grid.Row="0" Margin="0,0,0,12" ColumnDefinitions="160,12,*">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="URL:"
+                       VerticalAlignment="Center" Margin="0,0,0,8"/>
+            <TextBox x:Name="txtUrl" Grid.Row="0" Grid.Column="2"
+                     Text="8.8.8.8" Margin="0,0,0,8"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Ping Count:"
+                       VerticalAlignment="Center" Margin="0,0,0,8"/>
+            <TextBox x:Name="txtCount" Grid.Row="1" Grid.Column="2"
+                     Text="10" Margin="0,0,0,8"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Timeout (ms):"
+                       VerticalAlignment="Center"/>
+            <TextBox x:Name="txtTimeout" Grid.Row="2" Grid.Column="2"
+                     Text="1000"/>
+          </Grid>
+
+          <Grid Grid.Row="1" Margin="0,0,0,8" ColumnDefinitions="*,8,*,8,*,8,*,8,*">
+            <Button x:Name="btnPing" Grid.Column="0" Content="Start Test" Click="Ping_Click"/>
+            <Button x:Name="btnStop" Grid.Column="2" Content="Stop" Click="Stop_Click" IsEnabled="False"/>
+            <Button x:Name="btnClear" Grid.Column="4" Content="Clear" Click="ClearPing_Click"/>
+            <Button x:Name="btnGraph" Grid.Column="6" Content="Graph" Click="Graph_Click"/>
+            <Button x:Name="btnExport" Grid.Column="8" Content="Export" Click="Export_Click"/>
+          </Grid>
+
+          <ProgressBar x:Name="progress" Grid.Row="2" Margin="0,0,0,8" Height="6"/>
+
+          <Border Grid.Row="3" BorderBrush="Gray" BorderThickness="1">
+            <TextBox x:Name="txtResults" IsReadOnly="True" AcceptsReturn="True"
+                     FontFamily="Consolas,monospace" FontSize="12"
+                     BorderThickness="0" Padding="8"/>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <TabItem x:Name="tabTrace" Header="Trace Route">
+        <Grid Margin="0,12,0,0">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="92"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+
+          <TextBlock x:Name="StatusText" Grid.Row="0"
+                     FontWeight="SemiBold" FontSize="14"
+                     TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+          <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1"
+                  Padding="8" Margin="0,0,0,8">
+            <Canvas x:Name="RouteCanvas" ClipToBounds="True"/>
+          </Border>
+
+          <DataGrid x:Name="ResultsList" Grid.Row="2"
+                    AutoGenerateColumns="False"
+                    CanUserReorderColumns="False"
+                    CanUserResizeColumns="True"
+                    CanUserSortColumns="True"
+                    IsReadOnly="True"
+                    SelectionMode="Single"
+                    GridLinesVisibility="Horizontal"
+                    BorderBrush="Gray"
+                    BorderThickness="1"
+                    HeadersVisibility="Column">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Nr"          Binding="{Binding Nr}"         Width="45"/>
+              <DataGridTextColumn Header="IP Address"  Binding="{Binding IPAddress}"  Width="130"/>
+              <DataGridTextColumn Header="Domain Name" Binding="{Binding DomainName}" Width="*"/>
+              <DataGridTextColumn Header="Loss"        Binding="{Binding Loss}"       Width="60"/>
+              <DataGridTextColumn Header="Sent"        Binding="{Binding Sent}"       Width="55"/>
+              <DataGridTextColumn Header="Recv"        Binding="{Binding Received}"   Width="55"/>
+              <DataGridTextColumn Header="Best"        Binding="{Binding Best}"       Width="65"/>
+              <DataGridTextColumn Header="Avrg"        Binding="{Binding Avrg}"       Width="65"/>
+              <DataGridTextColumn Header="Wrst"        Binding="{Binding Wrst}"       Width="65"/>
+              <DataGridTextColumn Header="Last"        Binding="{Binding Last}"       Width="65"/>
+            </DataGrid.Columns>
+          </DataGrid>
+
+          <Grid Grid.Row="3" Margin="0,8,0,0" ColumnDefinitions="*,8,*,8,*,8,*">
+            <Button x:Name="btnStartTrace" Grid.Column="0" Content="Start Trace" Click="BtnStartTrace_Click"/>
+            <Button x:Name="btnStopTrace" Grid.Column="2" Content="Stop Trace" Click="BtnStopTrace_Click" IsEnabled="False"/>
+            <Button x:Name="btnClearResults" Grid.Column="4" Content="Clear Results" Click="BtnClearResults_Click"/>
+            <Button x:Name="btnSaveResults" Grid.Column="6" Content="Save Results" Click="BtnSaveResults_Click"/>
+          </Grid>
+        </Grid>
+      </TabItem>
+
+    </TabControl>
+  </Grid>
+</Window>

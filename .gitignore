@@ -91,3 +91,4 @@ node_modules/
 # Ignore macOS system files
 .AppleDouble
 .LSOverride
+/out

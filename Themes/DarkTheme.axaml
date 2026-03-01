@@ -1,0 +1,78 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style Selector="Window">
+    <Setter Property="Background" Value="#1E1E1E"/>
+    <Setter Property="Foreground" Value="#F1F1F1"/>
+  </Style>
+
+  <Style Selector="TextBlock">
+    <Setter Property="Foreground" Value="#F1F1F1"/>
+  </Style>
+
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="#333337"/>
+    <Setter Property="Foreground" Value="#F1F1F1"/>
+    <Setter Property="BorderBrush" Value="#3F3F46"/>
+  </Style>
+
+  <Style Selector="Button">
+    <Setter Property="Background" Value="#0078D4"/>
+    <Setter Property="Foreground" Value="#FFFFFF"/>
+    <Setter Property="BorderBrush" Value="#0078D4"/>
+    <Setter Property="Padding" Value="14,6"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="CornerRadius" Value="3"/>
+  </Style>
+
+  <Style Selector="Button:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="#1C97EA"/>
+  </Style>
+
+  <Style Selector="Button:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="#0062A3"/>
+  </Style>
+
+  <Style Selector="Button:disabled /template/ ContentPresenter">
+    <Setter Property="Background" Value="#2D2D30"/>
+    <Setter Property="Foreground" Value="#656565"/>
+  </Style>
+
+  <Style Selector="ProgressBar">
+    <Setter Property="Background" Value="#252526"/>
+    <Setter Property="Foreground" Value="#0078D4"/>
+  </Style>
+
+  <Style Selector="TabItem">
+    <Setter Property="Foreground" Value="#CCCCCC"/>
+  </Style>
+
+  <Style Selector="TabItem:selected">
+    <Setter Property="Foreground" Value="#F1F1F1"/>
+    <Setter Property="Background" Value="#252526"/>
+  </Style>
+
+  <Style Selector="DataGrid">
+    <Setter Property="Background" Value="#1E1E1E"/>
+    <Setter Property="Foreground" Value="#F1F1F1"/>
+    <Setter Property="BorderBrush" Value="#3F3F46"/>
+  </Style>
+
+  <Style Selector="DataGridColumnHeader">
+    <Setter Property="Background" Value="#252526"/>
+    <Setter Property="Foreground" Value="#F1F1F1"/>
+  </Style>
+
+  <Style Selector="DataGridRow">
+    <Setter Property="Background" Value="Transparent"/>
+  </Style>
+
+  <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+    <Setter Property="Fill" Value="#3E3E42"/>
+  </Style>
+
+  <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+    <Setter Property="Fill" Value="#0078D4"/>
+  </Style>
+
+</Styles>

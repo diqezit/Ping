@@ -2,25 +2,26 @@
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net9.0-windows</TargetFramework>
-		<UseWPF>true</UseWPF>
+		<TargetFramework>net9.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<LangVersion>preview</LangVersion>
-		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<AssemblyName>PingTestTool</AssemblyName>
 		<RootNamespace>PingTestTool</RootNamespace>
-		<ApplicationIcon>computr.ico</ApplicationIcon>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<PublishReadyToRun>true</PublishReadyToRun>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Avalonia" Version="11.2.3" />
+		<PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.3" />
+		<PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.3" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.2" />
 		<PackageReference Include="DnsClient" Version="1.8.0" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Resource Include="Images\*.png" />
-		<Resource Include="computr.ico" />
 	</ItemGroup>
 
 </Project>

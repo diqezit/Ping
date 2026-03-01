@@ -1,9 +1,8 @@
 ﻿namespace PingTestTool.Visual;
 
-[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public sealed class RouteRenderer(
     Canvas canvas,
-    Func<string, Brush?> findBrush,
+    Func<string, IBrush?> findBrush,
     Func<string, Color?> findColor,
     Action<TraceResult>? onClick = null)
 {
@@ -11,9 +10,7 @@ public sealed class RouteRenderer(
     const int MaxIpLen = 12;
 
     readonly List<(Ellipse E, TextBlock Nr, TextBlock Ip)> _hops = new(32);
-
     Line? _routeLine;
-    SolidColorBrush? _lastLineBrush;
 
     public void Clear()
     {
@@ -30,7 +27,7 @@ public sealed class RouteRenderer(
             return;
         }
 
-        double w = canvas.ActualWidth, h = canvas.ActualHeight;
+        double w = canvas.Bounds.Width, h = canvas.Bounds.Height;
         if (w < 50 || h < 20)
         {
             Clear();
@@ -40,8 +37,9 @@ public sealed class RouteRenderer(
         int cnt = results.Count;
         double step = (w - Margin * 2) / Math.Max(cnt - 1, 1), cy = h / 2;
 
-        var lineBrush = findBrush("RouteLine") as SolidColorBrush ?? CreateBrush(Color.FromRgb(100, 100, 100));
-        var textBrush = findBrush("RouteText") ?? CreateBrush(Color.FromRgb(200, 200, 200));
+        var lineBrush = findBrush("RouteLine") as ISolidColorBrush
+            ?? new SolidColorBrush(Color.FromRgb(100, 100, 100));
+        var textBrush = findBrush("RouteText") ?? new SolidColorBrush(Color.FromRgb(200, 200, 200));
         var goodColor = findColor("RouteGoodColor") ?? Colors.DodgerBlue;
         var badColor = findColor("RouteBadColor") ?? Colors.Red;
 
@@ -58,31 +56,21 @@ public sealed class RouteRenderer(
         }
     }
 
-    static SolidColorBrush CreateBrush(Color c)
-    {
-        var b = new SolidColorBrush(c);
-        b.Freeze();
-        return b;
-    }
-
-    void EnsureLine(double x1, double y, double x2, SolidColorBrush brush)
+    void EnsureLine(double x1, double y, double x2, IBrush brush)
     {
         if (_routeLine is null)
         {
-            _routeLine = new Line { StrokeThickness = 3, StrokeDashArray = [4, 2] };
+            _routeLine = new Line
+            {
+                StrokeThickness = 3,
+                StrokeDashArray = [4, 2]
+            };
             canvas.Children.Add(_routeLine);
         }
 
-        _routeLine.X1 = x1;
-        _routeLine.Y1 = y;
-        _routeLine.X2 = x2;
-        _routeLine.Y2 = y;
-
-        if (_lastLineBrush != brush)
-        {
-            _routeLine.Stroke = brush;
-            _lastLineBrush = brush;
-        }
+        _routeLine.StartPoint = new Point(x1, y);
+        _routeLine.EndPoint = new Point(x2, y);
+        _routeLine.Stroke = brush;
     }
 
     void EnsureHops(int count)
@@ -105,15 +93,15 @@ public sealed class RouteRenderer(
                 Height = Radius * 2,
                 Stroke = Brushes.White,
                 StrokeThickness = 2,
-                Cursor = Cursors.Hand
+                Cursor = new Cursor(StandardCursorType.Hand)
             };
-            e.MouseLeftButtonDown += OnClick;
+            e.PointerPressed += OnPointerPressed;
 
             var nr = new TextBlock
             {
                 Foreground = Brushes.White,
                 FontSize = 10,
-                FontWeight = System.Windows.FontWeights.Bold,
+                FontWeight = FontWeight.Bold,
                 IsHitTestVisible = false
             };
 
@@ -131,18 +119,19 @@ public sealed class RouteRenderer(
         }
     }
 
-    void UpdateHop(int idx, double x, double cy, Color fill, TraceResult hop, Brush textBrush)
+    void UpdateHop(int idx, double x, double cy, Color fill, TraceResult hop, IBrush textBrush)
     {
         var (e, nr, ip) = _hops[idx];
 
-        e.Fill = CreateBrush(fill);
+        var brush = new SolidColorBrush(fill);
+        e.Fill = brush;
         e.Tag = hop;
-        e.ToolTip = BuildTip(hop);
+        ToolTip.SetTip(e, BuildTip(hop));
         Canvas.SetLeft(e, x - Radius);
         Canvas.SetTop(e, cy - Radius);
 
         nr.Text = hop.Nr.ToString();
-        nr.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        nr.Measure(Size.Infinity);
         Canvas.SetLeft(nr, x - nr.DesiredSize.Width / 2);
         Canvas.SetTop(nr, cy - nr.DesiredSize.Height / 2);
 
@@ -152,12 +141,12 @@ public sealed class RouteRenderer(
 
         ip.Text = ipText;
         ip.Foreground = textBrush;
-        ip.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        ip.Measure(Size.Infinity);
         Canvas.SetLeft(ip, x - ip.DesiredSize.Width / 2);
         Canvas.SetTop(ip, cy + Radius + 4);
     }
 
-    void OnClick(object sender, MouseButtonEventArgs e)
+    void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is Ellipse { Tag: TraceResult hop })
             onClick?.Invoke(hop);

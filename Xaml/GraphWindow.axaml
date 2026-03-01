@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PingTestTool.GraphWindow"
+        Title="Ping Graph"
+        Width="700" Height="480"
+        MinWidth="500" MinHeight="350"
+        WindowStartupLocation="CenterOwner">
+
+	<Grid Margin="12">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
+		<Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1">
+			<Canvas x:Name="GraphCanvas" ClipToBounds="True"/>
+		</Border>
+
+		<Grid Grid.Row="1" Margin="0,12,0,0" ColumnDefinitions="*,*,*,*">
+			<StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
+				<TextBlock Text="Min:" FontWeight="SemiBold" Margin="0,0,6,0"/>
+				<TextBlock x:Name="MinVal" Text="0" FontFamily="Consolas,monospace"/>
+			</StackPanel>
+			<StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+				<TextBlock Text="Avg:" FontWeight="SemiBold" Margin="0,0,6,0"/>
+				<TextBlock x:Name="AvgVal" Text="0" FontFamily="Consolas,monospace"/>
+			</StackPanel>
+			<StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
+				<TextBlock Text="Max:" FontWeight="SemiBold" Margin="0,0,6,0"/>
+				<TextBlock x:Name="MaxVal" Text="0" FontFamily="Consolas,monospace"/>
+			</StackPanel>
+			<StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center">
+				<TextBlock Text="Cur:" FontWeight="SemiBold" Margin="0,0,6,0"/>
+				<TextBlock x:Name="CurVal" Text="0" FontFamily="Consolas,monospace"/>
+			</StackPanel>
+		</Grid>
+
+		<Grid Grid.Row="2" Margin="0,12,0,0" ColumnDefinitions="Auto,12,*,12,60">
+			<TextBlock Grid.Column="0" Text="Points:" VerticalAlignment="Center"/>
+			<Slider x:Name="PointsSlider" Grid.Column="2"
+					Minimum="25" Maximum="500" Value="100"
+					TickFrequency="25" IsSnapToTickEnabled="True"/>
+			<TextBlock x:Name="PointsVal" Grid.Column="4"
+					   Text="100" TextAlignment="Right"
+					   FontFamily="Consolas,monospace" VerticalAlignment="Center"/>
+		</Grid>
+	</Grid>
+</Window>
